@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { NextResponse } from "next/server";
 import { safeFetch } from "@/lib/server/ssrf";
+import { detectSiteFonts } from "@/lib/server/site-fonts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -59,7 +60,10 @@ export async function POST(req: Request) {
     const mobile = $('a[href^="tel:"]').first().attr("href")?.replace(/^tel:/i, "") ?? "";
     const host = new URL(base).hostname.replace(/^www\./, "");
 
+    const fonts = await detectSiteFonts(page.buffer.toString("utf8"), base).catch(() => ({ heading: null, body: null, custom: [] }));
+
     return NextResponse.json({
+      fonts,
       domain: host,
       name: siteName || title || host.split(".")[0],
       themeColor: /^#[0-9a-f]{3,8}$/i.test(themeColor ?? "") ? themeColor : null,

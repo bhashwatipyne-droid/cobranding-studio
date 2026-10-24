@@ -2,7 +2,7 @@
 import { FabricObject, Group, StaticCanvas, Textbox } from "fabric";
 import JSZip from "jszip";
 import { jsPDF } from "jspdf";
-import { configureFabric, ensureFont } from "./fabric-setup";
+import { configureFabric, ensureFont, registerKitFonts } from "./fabric-setup";
 import { makeLogo, logoBox } from "./layouts";
 import { combineDetails } from "./templates";
 import type { BrandKit, ContentType, DesignDoc } from "./types";
@@ -28,6 +28,7 @@ async function overlayBar(kit: BrandKit, w: number, h: number, where: "top" | "b
   const logo: Group = await makeLogo(kit, true, bw, bh);
   const m = Math.round(w * 0.04);
   logo.set({ left: m, top: top + (sh - bh) / 2 });
+  registerKitFonts(kit);
   await ensureFont(kit.fontBody);
   const fs = Math.max(16, Math.round(sh * 0.3));
   const details = new Textbox(combineDetails(kit) || kit.companyName, {

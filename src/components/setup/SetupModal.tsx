@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { FONT_CHOICES, SIZES, sizeById } from "@/lib/fabric-setup";
+import { FONT_CHOICES, SIZES, sizeById, ensureFont, registerKitFonts } from "@/lib/fabric-setup";
 import { POS_LABEL, POS_OPTIONS, combineDetails } from "@/lib/templates";
 import type { BrandKit, LogoPos } from "@/lib/types";
 import { detectPalette, fileToDataUrl, processLogoDataUrl, svgToDataUrl } from "@/lib/vectorize";
@@ -76,7 +76,14 @@ export function SetupModal() {
         companyName: d.companyName && !d.companyName.startsWith("Your Company") ? d.companyName : j.name || d.companyName,
         email: d.email || j.email || "", mobile: d.mobile || j.mobile || "", website: j.website || d.website,
         color: j.themeColor || d.color,
+        fontHeading: j.fonts?.heading || d.fontHeading,
+        fontBody: j.fonts?.body || d.fontBody,
+        customFonts: j.fonts?.custom ?? [],
       }));
+      if (j.fonts?.heading || j.fonts?.body) {
+        registerKitFonts({ customFonts: j.fonts.custom });
+        await Promise.all([j.fonts.heading, j.fonts.body].filter(Boolean).map((f: string) => ensureFont(f)));
+      }
       if (j.logoDataUrl) await ingestLogo(j.logoDataUrl, true);
       else toast("No logo found on that site — upload one below");
       toast("Pulled what we could from the website — check the details");
@@ -101,6 +108,7 @@ export function SetupModal() {
     if (screen === "editor" && doc?.kitKey === kit.key) void applyKitAll();
   }
 
+  const fontOptions = Array.from(new Set([draft.fontHeading, draft.fontBody, ...FONT_CHOICES]));
   const logoPreview = draft.logoSvg ? svgToDataUrl(draft.logoSvg) : draft.logoOriginal;
 
   return (
@@ -161,8 +169,8 @@ export function SetupModal() {
                 ))}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <Field label="Heading font"><select value={draft.fontHeading} onChange={(e) => set("fontHeading", e.target.value)} className="h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px]">{FONT_CHOICES.map((f) => <option key={f}>{f}</option>)}</select></Field>
-                <Field label="Body font"><select value={draft.fontBody} onChange={(e) => set("fontBody", e.target.value)} className="h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px]">{FONT_CHOICES.map((f) => <option key={f}>{f}</option>)}</select></Field>
+                <Field label="Heading font"><select value={draft.fontHeading} onChange={(e) => set("fontHeading", e.target.value)} className="h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px]">{fontOptions.map((f) => <option key={f}>{f}</option>)}</select></Field>
+                <Field label="Body font"><select value={draft.fontBody} onChange={(e) => set("fontBody", e.target.value)} className="h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px]">{fontOptions.map((f) => <option key={f}>{f}</option>)}</select></Field>
               </div>
             </section>
 

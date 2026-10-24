@@ -22,6 +22,8 @@ export interface BrandKit {
   position: LogoPos;
   fontHeading: string;
   fontBody: string;
+  /** Fonts that aren't on Google Fonts (picked up from the brand's website) — registered from their file URL */
+  customFonts?: { family: string; url: string }[];
   autoApply: boolean;
   setupComplete: boolean;
   companyName: string;

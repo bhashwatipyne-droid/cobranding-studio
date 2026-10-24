@@ -7,7 +7,7 @@ import {
   ActiveSelection, Canvas, Circle, FabricImage, FabricObject, Gradient, Group, Path, Point, Rect, Shadow, Textbox, Triangle, filters, util,
 } from "fabric";
 import { complianceSynonyms, computeFlagSpans, replaceTerm } from "./compliance";
-import { configureFabric, ensureFont, CUSTOM_PROPS } from "./fabric-setup";
+import { configureFabric, ensureFont, registerKitFonts, CUSTOM_PROPS } from "./fabric-setup";
 import { LAYOUT_ROLES, buildBrand, buildPage, fitImage, setImageSource, type BuildInput, type Grad, type PageContent } from "./layouts";
 import type { BrandKit, LayoutId } from "./types";
 import { buildRemap, fromHsl, parseCss, toHsl, type ColorUse } from "./recolor";
@@ -570,6 +570,7 @@ export class CanvasController {
 
   /** Re-apply logo / details / fonts without regenerating the layout (FR-17). */
   async reapplyKit(kit: BrandKit, palette: [string, string], layout: LayoutId = "hero") {
+    registerKitFonts(kit);
     await Promise.all([ensureFont(kit.fontHeading), ensureFont(kit.fontBody)]);
     const objs = this.canvas.getObjects();
     const fresh = await buildBrand({ kit, applyKit: true, layout, palette, content: { headline: "", sub: "" }, w: this.W, h: this.H });

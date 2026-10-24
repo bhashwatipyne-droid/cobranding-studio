@@ -99,10 +99,25 @@ export const FONT_CHOICES = [
   "Figtree", "Urbanist", "Bebas Neue", "Abril Fatface", "Bree Serif",
 ];
 
+const customUrls = new Map<string, string>();
+const customLoaded = new Set<string>();
+/** Fonts taken from a brand's own website (not on Google Fonts) are registered straight from their file URL. */
+export function registerKitFonts(kit: { customFonts?: { family: string; url: string }[] }) {
+  for (const f of kit.customFonts ?? []) if (f.family && f.url) customUrls.set(f.family, f.url);
+}
+
 /** Load a Google font and wait until the canvas can actually draw with it. */
 export async function ensureFont(family: string, weights: number[] = [300, 400, 500, 600, 700, 800]) {
   if (typeof document === "undefined" || !family) return;
-  if (!loadedFonts.has(family) && family !== "Georgia") {
+  const own = customUrls.get(family);
+  if (own && !customLoaded.has(family)) {
+    customLoaded.add(family);
+    try {
+      const face = new FontFace(family, `url("${own}")`, { weight: "100 900" });
+      document.fonts.add(await face.load());
+    } catch { customLoaded.delete(family); /* blocked/CORS — fall through to Google/system */ }
+  }
+  if (!own && !loadedFonts.has(family) && family !== "Georgia") {
     loadedFonts.add(family);
     const link = document.createElement("link");
     link.rel = "stylesheet";

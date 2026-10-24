@@ -8,7 +8,7 @@ import {
 } from "fabric";
 import { isArtLayout, type BrandKit, type LayoutId, type LogoPos, type TemplateDef } from "./types";
 import { combineDetails } from "./templates";
-import { ensureFont } from "./fabric-setup";
+import { ensureFont, registerKitFonts } from "./fabric-setup";
 import { initials, uid } from "./utils";
 import { buildArt } from "./template-art";
 
@@ -234,6 +234,7 @@ export async function buildPage(inp: BuildInput): Promise<BuiltPage> {
   const { w, h, palette, content, applyKit, kit, layout } = inp;
   const headFont = applyKit ? kit.fontHeading : "Sora";
   const bodyFont = applyKit ? kit.fontBody : "Inter";
+  registerKitFonts(kit);
   await Promise.all([ensureFont(headFont), ensureFont(bodyFont)]);
 
   const u = Math.min(w, h * 1.25) / 1080; // type scale
