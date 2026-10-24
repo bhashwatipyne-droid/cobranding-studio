@@ -46,6 +46,19 @@ export function ContextToolbar() {
   const toast = useStudio((s) => s.toast);
   const fileRef = useRef<HTMLInputElement>(null);
   if (!c) return null;
+  if (sel?.kind === "background" && sel.bg) {
+    const bg = sel.bg;
+    return (
+      <div className="flex h-12 items-center gap-1 overflow-x-auto border-b border-line bg-surface px-4" role="toolbar" aria-label="Background tools">
+        <span className="mr-2 shrink-0 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">Background</span>
+        <Color label="Background colour" value={bg.from} onChange={(v) => c.setBackgroundColors(v, bg.to)} />
+        {bg.to ? <Color label="Gradient end colour" value={bg.to} onChange={(v) => c.setBackgroundColors(bg.from, v)} /> : null}
+        <button onClick={() => c.setBackgroundColors(bg.from, bg.to ? null : bg.from)} className="ml-1 shrink-0 rounded-md border border-line-2 px-3 py-1.5 text-xs font-semibold text-ink-soft hover:border-accent hover:text-accent">{bg.to ? "Make solid" : "Make gradient"}</button>
+        {bg.hasImage && <button onClick={() => c.removeBackgroundImage()} className="ml-1 shrink-0 rounded-md border border-line-2 px-3 py-1.5 text-xs font-semibold text-ink-soft hover:border-accent hover:text-accent">Remove background image</button>}
+        <span className="ml-3 text-xs text-ink-faint">Colours change the page behind your elements.</span>
+      </div>
+    );
+  }
   if (!sel) return <div className="flex h-12 items-center border-b border-line bg-surface px-5 text-xs text-ink-faint">Click anything on the canvas to edit it. Double-click text to type.</div>;
   const t = sel.text;
   const isTxt = !!t;

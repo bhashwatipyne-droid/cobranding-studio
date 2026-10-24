@@ -68,7 +68,8 @@ export function Panels() {
           <div className="grid grid-cols-2 gap-2">
             {s.templates.filter((t) => !t.custom).map((t) => (
               <button key={t.id} onClick={() => void s.applyLayoutFrom(t)} className="overflow-hidden rounded-lg border border-line text-left transition hover:border-accent">
-                <div className="grid h-16 place-items-center px-2 text-center text-[10px] font-bold text-white" style={{ background: gradientCss(t.palette) }}>{t.name}</div>
+                {t.thumbnail ? <img src={t.thumbnail} alt={t.name} loading="lazy" className="aspect-[4/5] w-full object-cover object-top" /> : <div className="grid h-16 place-items-center px-2 text-center text-[10px] font-bold text-white" style={{ background: gradientCss(t.palette) }}>{t.name}</div>}
+                <div className="truncate px-2 py-1.5 text-[11px] font-semibold text-ink-soft">{t.name}</div>
               </button>
             ))}
           </div>

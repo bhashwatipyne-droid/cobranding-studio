@@ -10,6 +10,7 @@ import { complianceSynonyms, computeFlagSpans, replaceTerm } from "./compliance"
 import { configureFabric, ensureFont, CUSTOM_PROPS } from "./fabric-setup";
 import { LAYOUT_ROLES, buildBrand, buildPage, fitImage, setImageSource, type BuildInput, type Grad, type PageContent } from "./layouts";
 import type { BrandKit, LayoutId } from "./types";
+import { buildRemap, fromHsl, parseCss, toHsl, type ColorUse } from "./recolor";
 import { uid } from "./utils";
 
 export interface SelInfo {
@@ -26,6 +27,7 @@ export interface SelInfo {
   };
   paint?: { fill: string; stroke: string; strokeWidth: number };
   image?: { brightness: number; contrast: number; saturation: number; whiteRemoved: boolean };
+  bg?: { from: string; to: string | null; hasImage: boolean };
 }
 
 export interface LayerInfo { id: string; name: string; kind: string; visible: boolean; locked: boolean; selected: boolean }
@@ -106,6 +108,8 @@ export class CanvasController {
     c.on("selection:created", sel);
     c.on("selection:updated", sel);
     c.on("selection:cleared", () => { this.hooks.onSelection(null); this.hooks.onCompliance(null); });
+    // clicking empty canvas selects the page background (it is not an object, so we surface it as a pseudo-selection)
+    c.on("mouse:down", (e) => { if (!e.target && !c.getActiveObject()) this.emitBackground(); });
     c.on("object:added", (e) => {
       // Fabric 7 textboxes only get left/right handles. Add corner + top/bottom handles (scale the type, Canva-style).
       const t = e.target;
@@ -339,6 +343,29 @@ export class CanvasController {
     return a instanceof ActiveSelection ? a.getObjects() : [a];
   }
 
+  emitBackground() {
+    const bg = this.canvas.backgroundColor;
+    const from = bg instanceof Gradient ? bg.colorStops[0]?.color ?? "#FFFFFF" : typeof bg === "string" && bg ? bg : "#FFFFFF";
+    const to = bg instanceof Gradient ? bg.colorStops[bg.colorStops.length - 1]?.color ?? null : null;
+    this.hooks.onSelection({ count: 0, ids: [], kind: "background", locked: false, opacity: 1, isGroup: false, bg: { from, to, hasImage: !!this.canvas.backgroundImage } });
+  }
+  setBackgroundColors(from: string, to: string | null) {
+    this.canvas.backgroundColor = to
+      ? new Gradient({ type: "linear", gradientUnits: "pixels", coords: { x1: 0, y1: 0, x2: this.W, y2: this.H }, colorStops: [{ offset: 0, color: from }, { offset: 1, color: to }] })
+      : from;
+    this.canvas.requestRenderAll();
+    this.emitBackground();
+    if (this.bgTimer) clearTimeout(this.bgTimer);
+    this.bgTimer = setTimeout(() => this.commit("Changed background"), 400);
+  }
+  private bgTimer: ReturnType<typeof setTimeout> | null = null;
+  removeBackgroundImage() {
+    this.canvas.backgroundImage = undefined;
+    this.canvas.requestRenderAll();
+    this.commit("Removed background image");
+    this.emitBackground();
+  }
+
   emitSelection() {
     const a = this.canvas.getActiveObject();
     if (!a) { this.hooks.onSelection(null); return; }
@@ -546,8 +573,65 @@ export class CanvasController {
       }
       if (isText(o) && o.role === "stat") o.set("fill", kit.color);
     });
+    this.remapPalette(kit);
     this.canvas.requestRenderAll();
     this.commit("Applied brand kit");
+  }
+
+  /** Emphasis text must stay readable on the (re-coloured) background: darken until contrast >= 3:1 against every bg stop. */
+  private legible(css: string, bgs: string[]) {
+    const lum = (c: { r: number; g: number; b: number }) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+    const fg = parseCss(css);
+    const bl = bgs.map((b) => parseCss(b)).filter((x): x is NonNullable<typeof x> => !!x).map(lum);
+    if (!fg || !bl.length) return css;
+    const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const [h, sat] = toHsl(fg);
+    let l = toHsl(fg)[2];
+    const contrast = (ll: number) => { const [r, g, b] = fromHsl(h, sat, ll); const f = lum({ r, g, b }); return Math.min(...bl.map((x) => ratio(f, x))); };
+    for (let i = 0; i < 12 && contrast(l) < 3; i++) l = Math.max(0.1, l - 0.06);
+    const [r, g, b] = fromHsl(h, sat, l);
+    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  /** Walk every drawable (including group children) except the brand strip/logo/details and photos. */
+  private walkArt(fn: (o: FabricObject, weight: number) => void) {
+    const skip = new Set(["strip", "details", "logo", "plate"]);
+    const rec = (o: FabricObject) => {
+      if (o.role && skip.has(o.role)) return;
+      if (o.kind === "logo") return;
+      if (o instanceof FabricImage) return;
+      if (o instanceof Group && !(o instanceof ActiveSelection)) { o.getObjects().forEach(rec); return; }
+      const w = Math.max(1, (o.getScaledWidth() * o.getScaledHeight()) / 400);
+      fn(o, w);
+    };
+    this.canvas.getObjects().forEach(rec);
+  }
+
+  /** Remap every saturated colour in the design (shapes, lines, icons, text emphasis, background) onto the kit palette. */
+  private remapPalette(kit: BrandKit) {
+    const uses: ColorUse[] = [];
+    const bg = this.canvas.backgroundColor;
+    const bgStops = bg instanceof Gradient ? bg.colorStops.map((c) => c.color) : typeof bg === "string" ? [bg] : [];
+    bgStops.forEach((c) => uses.push({ css: c, weight: (this.W * this.H) / 800 }));
+    const each = (o: FabricObject, f: (css: string, wt: number) => void, w: number) => {
+      if (o.fill instanceof Gradient) o.fill.colorStops.forEach((c) => f(c.color, w));
+      else if (typeof o.fill === "string" && o.fill) f(o.fill, w);
+      if (typeof o.stroke === "string" && o.stroke) f(o.stroke, w * 0.3 + (o.strokeWidth ?? 0) * 20);
+      if (isText(o)) (o.richPhrases ?? []).forEach((p) => { if (p.fill) f(p.fill, 40); });
+    };
+    this.walkArt((o, w) => each(o, (css, wt) => uses.push({ css, weight: wt }), w));
+    const map = buildRemap(uses, kit.color, kit.secondary);
+    if (bg instanceof Gradient) bg.colorStops.forEach((c) => { c.color = map(c.color); });
+    else if (typeof bg === "string") this.canvas.backgroundColor = map(bg);
+    const bgNow = this.canvas.backgroundColor instanceof Gradient ? this.canvas.backgroundColor.colorStops.map((c) => c.color) : [String(this.canvas.backgroundColor || "#ffffff")];
+    this.walkArt((o) => {
+      if (o.fill instanceof Gradient) o.fill.colorStops.forEach((c) => { c.color = map(c.color); });
+      else if (typeof o.fill === "string" && o.fill) o.set("fill", map(o.fill));
+      if (typeof o.stroke === "string" && o.stroke) o.set("stroke", map(o.stroke));
+      if (isText(o)) (o.richPhrases ?? []).forEach((p) => { if (p.fill) p.fill = this.legible(map(p.fill), bgNow); });
+      o.dirty = true;
+    });
+    this.reflagAll();
   }
 
   // ───────────────────────── adding elements ─────────────────────────
