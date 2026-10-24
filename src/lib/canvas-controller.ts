@@ -106,7 +106,15 @@ export class CanvasController {
     c.on("selection:created", sel);
     c.on("selection:updated", sel);
     c.on("selection:cleared", () => { this.hooks.onSelection(null); this.hooks.onCompliance(null); });
-    c.on("object:added", () => { if (!this.restoring) this.hooks.onLayers(); });
+    c.on("object:added", (e) => {
+      // Fabric 7 textboxes only get left/right handles. Add corner + top/bottom handles (scale the type, Canva-style).
+      const t = e.target;
+      if (t && isText(t)) {
+        const base = FabricObject.createControls().controls;
+        t.controls = { ...t.controls, tl: base.tl, tr: base.tr, bl: base.bl, br: base.br, mt: base.mt, mb: base.mb };
+      }
+      if (!this.restoring) this.hooks.onLayers();
+    });
     c.on("object:removed", () => { if (!this.restoring) this.hooks.onLayers(); });
 
     c.on("object:moving", (e) => {
@@ -139,6 +147,13 @@ export class CanvasController {
 
     c.on("object:modified", (e) => {
       const t = e.target;
+      if (t && isText(t) && (Math.abs((t.scaleX ?? 1) - 1) > 0.001 || Math.abs((t.scaleY ?? 1) - 1) > 0.001)) {
+        // bake the drag into real font size + box width so text stays crisp and the toolbar size is truthful
+        const sx = t.scaleX ?? 1, sy = t.scaleY ?? 1;
+        t.set({ fontSize: Math.max(8, Math.round((t.fontSize ?? 16) * sy)), width: Math.max(40, (t.width ?? 100) * sx), scaleX: 1, scaleY: 1 });
+        t.initDimensions();
+        t.setCoords();
+      }
       if (t && isImage(t) && (Math.abs((t.scaleX ?? 1) - (t.scaleY ?? 1)) > 0.001 || t.slotW === undefined)) {
         this.normalizeImage(t);
       }

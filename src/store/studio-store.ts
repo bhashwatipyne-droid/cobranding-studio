@@ -376,3 +376,6 @@ export const useStudio = create<StudioState>((set, get) => ({
     set((st) => (st.doc ? { doc: { ...st.doc, isShared: r.isShared, shareToken: r.shareToken } } : {}));
   },
 }));
+
+// debugging / e2e hook (store only; holds no secrets)
+if (typeof window !== "undefined") (window as unknown as { __studio?: typeof useStudio }).__studio = useStudio;
