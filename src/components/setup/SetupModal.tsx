@@ -73,7 +73,7 @@ export function SetupModal() {
       if (!res.ok) throw new Error(j.error || "Couldn't reach that site");
       setDraft((d) => ({
         ...d,
-        companyName: d.companyName && !d.companyName.startsWith("Your Company") ? d.companyName : j.name || d.companyName,
+        companyName: j.name || d.companyName,
         email: d.email || j.email || "", mobile: d.mobile || j.mobile || "", website: j.website || d.website,
         color: j.themeColor || d.color,
         fontHeading: j.fonts?.heading || d.fontHeading,
@@ -169,8 +169,8 @@ export function SetupModal() {
                 ))}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
-                <Field label="Heading font"><select value={draft.fontHeading} onChange={(e) => set("fontHeading", e.target.value)} className="h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px]">{fontOptions.map((f) => <option key={f}>{f}</option>)}</select></Field>
-                <Field label="Body font"><select value={draft.fontBody} onChange={(e) => set("fontBody", e.target.value)} className="h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px]">{fontOptions.map((f) => <option key={f}>{f}</option>)}</select></Field>
+                <Field label="Heading font"><input list="font-list" value={draft.fontHeading} onChange={(e) => { set("fontHeading", e.target.value); void ensureFont(e.target.value.trim()); }} placeholder="Type any Google font" className="h-10 w-full rounded-md border border-line-2 bg-white px-3 text-[13px]" /></Field>
+                <Field label="Body font"><input list="font-list" value={draft.fontBody} onChange={(e) => { set("fontBody", e.target.value); void ensureFont(e.target.value.trim()); }} placeholder="Type any Google font" className="h-10 w-full rounded-md border border-line-2 bg-white px-3 text-[13px]" /></Field>
               </div>
             </section>
 
@@ -195,7 +195,7 @@ export function SetupModal() {
             <section>
               <h4 className="mb-2.5 text-sm">5 · Company details <span className="font-medium text-ink-faint">(shown in the header/footer strip)</span></h4>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Company name"><div className="relative"><Input value={draft.companyName} readOnly disabled className="pr-24" /><Verified /></div></Field>
+                <Field label="Company name"><div className="relative"><Input value={draft.companyName} onChange={(e) => set("companyName", e.target.value)} placeholder="Your company name" /></div></Field>
                 <Field label="SEBI registration (RRN)" hint="Verified from your account — change it in account settings."><div className="relative"><Input value={draft.rrn} readOnly disabled className="pr-24" /><Verified /></div></Field>
                 <Field label="Email"><Input value={draft.email} onChange={(e) => set("email", e.target.value)} placeholder="care@company.com" /></Field>
                 <Field label="Mobile"><Input value={draft.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="+91 …" /></Field>
@@ -225,6 +225,7 @@ export function SetupModal() {
               <Switch checked={draft.autoApply} onCheckedChange={(v) => set("autoApply", v)} aria-label="Auto-apply" />
             </section>
           </div>
+          <datalist id="font-list">{fontOptions.map((f) => <option key={f} value={f} />)}</datalist>
           <div className="flex justify-end gap-2 border-t border-line px-8 py-4">
             <Button variant="outline" onClick={() => setSetupOpen(false)}>Cancel</Button>
             <Button onClick={() => void save()} disabled={saving || !draft.companyName.trim()}>{saving && <Loader2 className="animate-spin" />}Save setup</Button>

@@ -89,7 +89,7 @@ export const sizeById = (id: string) => SIZES.find((s) => s.id === id) ?? SIZES[
 // ── fonts ──
 const loadedFonts = new Set(["Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia", "Bree Serif"]);
 /** Google families that only ship a regular weight — asking for wght@… makes the whole request fail. */
-const SINGLE_WEIGHT = new Set(["Bree Serif", "Bebas Neue", "Abril Fatface"]);
+const SINGLE_WEIGHT = new Set(["Bree Serif", "Bebas Neue", "Abril Fatface", "Lobster", "Pacifico", "Satisfy", "Anton", "Righteous", "Great Vibes"]);
 export const FONT_CHOICES = [
   "Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia",
   "Montserrat", "Open Sans", "Nunito", "Raleway", "Oswald", "Work Sans", "Rubik", "Karla",
@@ -97,6 +97,7 @@ export const FONT_CHOICES = [
   "Josefin Sans", "Cabin", "Barlow", "Mulish", "Heebo", "Libre Baskerville", "Crimson Text",
   "Bitter", "Domine", "Zilla Slab", "Archivo", "Epilogue", "Outfit", "Plus Jakarta Sans",
   "Figtree", "Urbanist", "Bebas Neue", "Abril Fatface", "Bree Serif",
+  "Lobster", "Pacifico", "Dancing Script", "Caveat", "Satisfy", "Comfortaa", "Anton", "Righteous", "Great Vibes", "Cinzel", "Lora", "Noto Sans", "Nunito Sans", "IBM Plex Sans", "Source Sans 3", "Cormorant Garamond",
 ];
 
 const customUrls = new Map<string, string>();
@@ -125,6 +126,8 @@ export async function ensureFont(family: string, weights: number[] = [300, 400, 
     link.href = SINGLE_WEIGHT.has(family)
       ? `https://fonts.googleapis.com/css2?family=${fam}&display=swap`
       : `https://fonts.googleapis.com/css2?family=${fam}:wght@400;600;700;800&display=swap`;
+    // a family that lacks some weights makes the whole request fail — retry with the plain family URL
+    link.onerror = () => { const plain = document.createElement("link"); plain.rel = "stylesheet"; plain.href = `https://fonts.googleapis.com/css2?family=${fam}&display=swap`; document.head.appendChild(plain); };
     document.head.appendChild(link);
   }
   try {
