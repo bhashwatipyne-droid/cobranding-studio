@@ -24,6 +24,8 @@ declare module "fabric" {
     hidden?: boolean;
     /** keep this text's own font when a brand kit is (re)applied — used by designed templates */
     keepFont?: boolean;
+    /** which brand font this text follows: decided once from the template's own hierarchy */
+    brandSlot?: "heading" | "body";
     /** designed inline emphasis (phrase → weight/colour); re-applied after every compliance restyle */
     richPhrases?: RichPhrase[];
   }
@@ -44,6 +46,8 @@ declare module "fabric" {
     layerName?: string;
     hidden?: boolean;
     keepFont?: boolean;
+    /** which brand font this text follows: decided once from the template's own hierarchy */
+    brandSlot?: "heading" | "body";
     richPhrases?: RichPhrase[];
   }
 }
@@ -52,7 +56,7 @@ export interface RichPhrase { text: string; fontWeight?: number; fill?: string }
 
 export const CUSTOM_PROPS = [
   "id", "role", "kind", "templateText", "sebiKept", "slotW", "slotH", "focusX", "focusY",
-  "isPlaceholder", "origText", "upper", "bullets", "layerName", "hidden", "keepFont", "richPhrases",
+  "isPlaceholder", "origText", "upper", "bullets", "layerName", "hidden", "keepFont", "brandSlot", "richPhrases",
   "lockMovementX", "lockMovementY", "lockRotation", "lockScalingX", "lockScalingY", "selectable", "evented",
 ];
 
