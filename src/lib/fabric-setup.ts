@@ -70,6 +70,7 @@ export function configureFabric() {
     borderColor: "#2B2BB5",
     transparentCorners: false,
     cornerSize: 11,
+    touchCornerSize: 28,
     borderScaleFactor: 2,
     padding: 0,
   });

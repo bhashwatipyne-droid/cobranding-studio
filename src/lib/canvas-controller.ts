@@ -152,7 +152,7 @@ export class CanvasController {
         const sx = t.scaleX ?? 1, sy = t.scaleY ?? 1;
         t.set({ fontSize: Math.max(8, Math.round((t.fontSize ?? 16) * sy)), width: Math.max(40, (t.width ?? 100) * sx), scaleX: 1, scaleY: 1 });
         t.initDimensions();
-        t.setCoords();
+        this.clampToCanvas(t);
       }
       if (t && isImage(t) && (Math.abs((t.scaleX ?? 1) - (t.scaleY ?? 1)) > 0.001 || t.slotW === undefined)) {
         this.normalizeImage(t);
@@ -188,6 +188,24 @@ export class CanvasController {
         this.commit(label);
       }
     });
+  }
+
+  /** Boxes saved before a web font finished loading can be shorter than their text; re-measure so handles hug the real text. */
+  private remeasureText() {
+    this.canvas.getObjects().forEach((o) => { if (isText(o)) { o.initDimensions(); o.setCoords(); } });
+  }
+
+  /** Keep resized text inside the canvas so every handle stays reachable (pointer events only reach the canvas element). */
+  private clampToCanvas(t: Textbox) {
+    const w = t.getScaledWidth(), h = t.getScaledHeight();
+    if (w > this.W || h > this.H) {
+      const k = Math.min(this.W / w, this.H / h);
+      t.set({ fontSize: Math.max(8, Math.round((t.fontSize ?? 16) * k)), width: Math.max(40, (t.width ?? 100) * k) });
+      t.initDimensions();
+    }
+    const nw = t.getScaledWidth(), nh = t.getScaledHeight();
+    t.set({ left: Math.min(Math.max(0, t.left ?? 0), Math.max(0, this.W - nw)), top: Math.min(Math.max(0, t.top ?? 0), Math.max(0, this.H - nh)) });
+    t.setCoords();
   }
 
   private normalizeImage(img: FabricImage) {
@@ -238,6 +256,7 @@ export class CanvasController {
       this.canvas.backgroundColor = "#FFFFFF";
     }
     this.canvas.setZoom(this.scale);
+    this.remeasureText();
     this.reflagAll();
     this.canvas.requestRenderAll();
     this.restoring = false;
@@ -299,6 +318,7 @@ export class CanvasController {
     await this.preloadFonts(json);
     await this.canvas.loadFromJSON(json);
     this.canvas.setZoom(this.scale);
+    this.remeasureText();
     this.reflagAll();
     this.canvas.requestRenderAll();
     this.restoring = false;
