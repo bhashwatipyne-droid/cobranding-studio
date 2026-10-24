@@ -139,10 +139,11 @@ export function Panels() {
       {panel === "layers" && (
         <>
           <H>Layers</H>
+          <p className="mb-2 text-xs text-ink-soft">Ctrl/Shift-click layers to select several.</p>
           <ul className="space-y-1">
             {layers.map((l, i) => (
               <li key={l.id} className={cn("flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs", l.selected ? "border-accent bg-accent-soft" : "border-transparent hover:bg-surface-2")}>
-                <button className="min-w-0 flex-1 truncate text-left font-semibold" onClick={() => c.select(l.id)}>{l.name}</button>
+                <button className="min-w-0 flex-1 truncate text-left font-semibold" onClick={(e) => c.select(l.id, e.ctrlKey || e.metaKey || e.shiftKey)}>{l.name}</button>
                 <button aria-label="Move up" disabled={i === 0} onClick={() => c.moveLayer(l.id, "up")} className="p-1 text-ink-faint hover:text-accent disabled:opacity-30"><ArrowUp className="size-3.5" /></button>
                 <button aria-label="Move down" disabled={i === layers.length - 1} onClick={() => c.moveLayer(l.id, "down")} className="p-1 text-ink-faint hover:text-accent disabled:opacity-30"><ArrowDown className="size-3.5" /></button>
                 <button aria-label={l.visible ? "Hide" : "Show"} onClick={() => c.toggleVisible(l.id)} className="p-1 text-ink-faint hover:text-accent">{l.visible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}</button>

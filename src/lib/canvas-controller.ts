@@ -57,6 +57,9 @@ const ICONS: Record<string, string> = {
 };
 
 const isText = (o: FabricObject | undefined | null): o is Textbox => !!o && o.type?.toLowerCase() === "textbox";
+/** A picture that covers the page (template scene). It must not swallow drag-to-select, so it is click-selected only. */
+const isBgArt = (o: FabricObject | undefined | null, W: number, H: number) =>
+  !!o && o.kind === "image" && (o.layerName === "Background art" || (o.getScaledWidth() >= W * 0.98 && o.getScaledHeight() >= H * 0.9));
 const isImage = (o: FabricObject | undefined | null): o is FabricImage => !!o && o.kind === "image";
 
 function paint(o: FabricObject, color: string) {
@@ -89,7 +92,7 @@ export class CanvasController {
     this.hooks = hooks;
     this.canvas = new Canvas(el, {
       width: this.W * this.scale, height: this.H * this.scale, backgroundColor: "#FFFFFF",
-      preserveObjectStacking: true, selection: true, stopContextMenu: true, fireRightClick: false,
+      preserveObjectStacking: true, selection: true, selectionKey: ["shiftKey", "ctrlKey", "metaKey"], stopContextMenu: true, fireRightClick: false,
     });
     this.canvas.setZoom(this.scale);
     this.bind();
@@ -109,13 +112,27 @@ export class CanvasController {
     c.on("selection:updated", sel);
     c.on("selection:cleared", () => { this.hooks.onSelection(null); this.hooks.onCompliance(null); });
     // clicking empty canvas selects the page background (it is not an object, so we surface it as a pseudo-selection)
-    c.on("mouse:down", (e) => { if (!e.target && !c.getActiveObject()) this.emitBackground(); });
+    let bgClick: FabricObject | null = null;
+    c.on("mouse:down", (e) => {
+      bgClick = null;
+      if (!e.target && !c.getActiveObject()) this.emitBackground();
+      else if (e.target && (e.target as FabricObject & { bgArt?: boolean }).bgArt && !c.getActiveObject()) bgClick = e.target;
+    });
+    // a plain click (no drag-box) on the template's background picture selects it, so its recolour tools stay reachable
+    c.on("mouse:up", () => {
+      if (bgClick && !c.getActiveObject()) { c.setActiveObject(bgClick); c.requestRenderAll(); this.emitSelection(); }
+      bgClick = null;
+    });
     c.on("object:added", (e) => {
       // Fabric 7 textboxes only get left/right handles. Add corner + top/bottom handles (scale the type, Canva-style).
       const t = e.target;
       if (t && isText(t)) {
         const base = FabricObject.createControls().controls;
         t.controls = { ...t.controls, tl: base.tl, tr: base.tr, bl: base.bl, br: base.br, mt: base.mt, mb: base.mb };
+      }
+      if (t && isBgArt(t, this.W, this.H)) {
+        if (t.lockMovementX !== true) t.set({ selectable: false, hasControls: false, lockMovementX: true, lockMovementY: true, hoverCursor: "default" });
+        (t as FabricObject & { bgArt?: boolean }).bgArt = true;
       }
       if (!this.restoring) this.hooks.onLayers();
     });
@@ -415,10 +432,21 @@ export class CanvasController {
     this.hooks.onSelection(info);
   }
 
-  select(id: string) {
+  select(id: string, additive = false) {
     const o = this.canvas.getObjects().find((x) => x.id === id);
     if (!o || o.hidden) return;
-    if (o.selectable === false) return;
+    if (o.selectable === false && !(o as FabricObject & { bgArt?: boolean }).bgArt) return;
+    const cur = this.canvas.getActiveObject();
+    if (additive && cur && !(o as FabricObject & { bgArt?: boolean }).bgArt) {
+      const have = cur instanceof ActiveSelection ? cur.getObjects() : [cur];
+      const next = have.includes(o) ? have.filter((x) => x !== o) : [...have, o];
+      this.canvas.discardActiveObject();
+      if (next.length === 1) this.canvas.setActiveObject(next[0]);
+      else if (next.length > 1) this.canvas.setActiveObject(new ActiveSelection(next, { canvas: this.canvas }));
+      this.canvas.requestRenderAll();
+      this.emitSelection();
+      return;
+    }
     this.canvas.setActiveObject(o);
     this.canvas.requestRenderAll();
     this.emitSelection();
@@ -427,6 +455,7 @@ export class CanvasController {
   selectAll() {
     const objs = this.canvas.getObjects().filter((o) => o.selectable !== false && !o.hidden);
     if (objs.length < 2) return;
+    this.canvas.discardActiveObject();
     this.canvas.setActiveObject(new ActiveSelection(objs, { canvas: this.canvas }));
     this.canvas.requestRenderAll();
     this.emitSelection();

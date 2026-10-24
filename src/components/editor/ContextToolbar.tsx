@@ -59,7 +59,12 @@ export function ContextToolbar() {
       </div>
     );
   }
-  if (!sel) return <div className="flex h-12 items-center border-b border-line bg-surface px-5 text-xs text-ink-faint">Click anything on the canvas to edit it. Double-click text to type.</div>;
+  if (!sel) return (
+    <div className="flex h-12 items-center gap-3 border-b border-line bg-surface px-5 text-xs text-ink-faint">
+      <span>Click to edit · double-click text to type · <b className="text-ink-soft">Ctrl/Shift-click</b> or <b className="text-ink-soft">drag a box</b> to select several.</span>
+      <button onClick={() => c.selectAll()} className="shrink-0 rounded-md border border-line-2 px-3 py-1.5 font-semibold text-ink-soft hover:border-accent hover:text-accent">Select all</button>
+    </div>
+  );
   const t = sel.text;
   const isTxt = !!t;
   const done = (l: string) => c.commit(l);
