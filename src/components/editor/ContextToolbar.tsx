@@ -1,7 +1,7 @@
 "use client";
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Copy, Eraser, Group, Italic, List, Lock, Minus, MoveDown, MoveUp,
-  Plus, Strikethrough, Sun, Trash2, Type, Underline, Ungroup, Unlock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ImagePlus, CaseUpper, Droplets,
+  Plus, Strikethrough, Sun, Trash2, Type, Underline, Ungroup, Unlock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ImagePlus, CaseUpper, Droplets, Palette,
 } from "lucide-react";
 import { useRef } from "react";
 import { Tip } from "@/components/ui/tooltip";
@@ -117,6 +117,10 @@ export function ContextToolbar() {
           <Slider label="Brightness" value={sel.image.brightness} min={50} max={150} step={5} onChange={(v) => c.setImageFilter("brightness", v)} onDone={() => done("Brightness")} icon={<Sun />} />
           <Slider label="Contrast" value={sel.image.contrast} min={50} max={150} step={5} onChange={(v) => c.setImageFilter("contrast", v)} onDone={() => done("Contrast")} icon={<span className="text-[10px] font-bold">C</span>} />
           <Slider label="Saturation" value={sel.image.saturation} min={0} max={200} step={5} onChange={(v) => c.setImageFilter("saturation", v)} onDone={() => done("Saturation")} icon={<span className="text-[10px] font-bold">S</span>} />
+          <Slider label="Hue shift (recolour)" value={sel.image.hue} min={-180} max={180} step={5} onChange={(v) => c.setImageHue(v)} onDone={() => done("Hue shift")} icon={<Palette />} />
+          {sel.image.isBackgroundArt && (
+            <button onMouseDown={(e) => e.preventDefault()} onClick={() => c.replaceBackgroundArt()} className="mx-1 shrink-0 rounded-md border border-line-2 px-2.5 py-1.5 text-xs font-semibold text-ink-soft hover:border-accent hover:text-accent">Use a solid colour instead</button>
+          )}
           <Btn label="Remove white background" active={sel.image.whiteRemoved} onClick={() => c.toggleWhiteRemoval()}><Eraser /></Btn>
           <Sep />
         </>

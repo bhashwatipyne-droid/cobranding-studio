@@ -26,7 +26,7 @@ export interface SelInfo {
     align: string; fill: string; lineHeight: number; upper: boolean; bullets: boolean; shadow: boolean;
   };
   paint?: { fill: string; stroke: string; strokeWidth: number };
-  image?: { brightness: number; contrast: number; saturation: number; whiteRemoved: boolean };
+  image?: { brightness: number; contrast: number; saturation: number; whiteRemoved: boolean; hue: number; isBackgroundArt: boolean };
   bg?: { from: string; to: string | null; hasImage: boolean };
 }
 
@@ -408,6 +408,8 @@ export class CanvasController {
         contrast: Math.round(get(filters.Contrast, "contrast") * 100) + 100,
         saturation: Math.round(get(filters.Saturation, "saturation") * 100) + 100,
         whiteRemoved: f.some((x) => x instanceof filters.RemoveColor),
+        hue: Math.round(((f.find((x) => x instanceof filters.HueRotation) as unknown as { rotation?: number } | undefined)?.rotation ?? 0) * 180),
+        isBackgroundArt: first.layerName === "Background art" || (first.getScaledWidth() >= this.W * 0.98 && first.getScaledHeight() >= this.H * 0.9),
       };
     }
     this.hooks.onSelection(info);
@@ -631,7 +633,67 @@ export class CanvasController {
       if (isText(o)) (o.richPhrases ?? []).forEach((p) => { if (p.fill) p.fill = this.legible(map(p.fill), bgNow); });
       o.dirty = true;
     });
+    // text on a re-coloured shape/background must stay readable: fall back to white or ink when contrast drops under 3:1
+    const lumOf = (css: string) => { const c = parseCss(css); if (!c) return null; const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+    const cr = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const all = this.canvas.getObjects();
+    all.forEach((t, idx) => {
+      if (!isText(t) || (t.role && ["strip", "details", "logo"].includes(t.role)) || typeof t.fill !== "string") return;
+      const fl = lumOf(t.fill);
+      if (fl === null) return;
+      const cx = (t.left ?? 0) + t.getScaledWidth() / 2, cy = (t.top ?? 0) + t.getScaledHeight() / 2;
+      let under: string | null = null;
+      for (let i = idx - 1; i >= 0 && !under; i--) {
+        const o = all[i];
+        if (o instanceof FabricImage || isText(o) || o.role === "strip") continue;
+        const l = o.left ?? 0, tp = o.top ?? 0;
+        if (cx < l || cx > l + o.getScaledWidth() || cy < tp || cy > tp + o.getScaledHeight()) continue;
+        if (typeof o.fill === "string" && o.fill && (parseCss(o.fill)?.a ?? 0) > 0.5) under = o.fill;
+        else if (o.fill instanceof Gradient && o.fill.colorStops.length) under = o.fill.colorStops[0].color;
+      }
+      if (!under) return; // over a picture or the page background: leave as designed
+      const bl = lumOf(under);
+      if (bl === null || cr(fl, bl) >= 3) return;
+      const white = cr(1, bl), ink = cr(lumOf("#0D1B3E") ?? 0, bl);
+      t.set("fill", white >= ink ? "#FFFFFF" : "#0D1B3E");
+      t.dirty = true;
+    });
+    // full-bleed pictures: rotate their hues so the scene's dominant colour lands on the brand primary
+    const targetHue = (() => { const c = parseCss(kit.color); return c ? toHsl(c)[0] : null; })();
+    if (targetHue !== null) {
+      this.canvas.getObjects().forEach((o) => {
+        if (!(o instanceof FabricImage) || o.getScaledWidth() < this.W * 0.9 || o.getScaledHeight() < this.H * 0.6) return;
+        const dom = this.dominantHue(o);
+        if (dom === null) return;
+        let d = targetHue - dom;
+        d = ((d + 540) % 360) - 180;
+        const rest = (o.filters ?? []).filter((f) => !(f instanceof filters.HueRotation));
+        o.filters = [...rest, new filters.HueRotation({ rotation: d / 180 })];
+        o.applyFilters();
+      });
+    }
     this.reflagAll();
+  }
+
+  /** Saturation-weighted circular mean hue of a picture (null if it is basically grey). */
+  private dominantHue(img: FabricImage): number | null {
+    try {
+      const src = img.getElement() as CanvasImageSource & { width: number; height: number };
+      const cv = document.createElement("canvas");
+      cv.width = 48; cv.height = 48;
+      const ctx = cv.getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(src, 0, 0, 48, 48);
+      const d = ctx.getImageData(0, 0, 48, 48).data;
+      let x = 0, y = 0, w = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const [h, sat, l] = toHsl({ r: d[i], g: d[i + 1], b: d[i + 2], a: 1 });
+        const wt = sat * (1 - Math.abs(l - 0.5) * 1.6);
+        if (wt <= 0.02) continue;
+        x += Math.cos((h * Math.PI) / 180) * wt; y += Math.sin((h * Math.PI) / 180) * wt; w += wt;
+      }
+      if (w < 3) return null;
+      return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+    } catch { return null; }
   }
 
   // ───────────────────────── adding elements ─────────────────────────
@@ -717,6 +779,26 @@ export class CanvasController {
     a.filters = v === 0 ? rest : [...rest, new T({ [kind]: v })];
     a.applyFilters();
     this.canvas.requestRenderAll();
+  }
+  /** Shift every hue in the picture (-180..180 degrees) — recolours a photographic background without replacing it. */
+  setImageHue(deg: number) {
+    const a = this.canvas.getActiveObject();
+    if (!isImage(a)) return;
+    const rest = (a.filters ?? []).filter((f) => !(f instanceof filters.HueRotation));
+    a.filters = deg === 0 ? rest : [...rest, new filters.HueRotation({ rotation: deg / 180 })];
+    a.applyFilters();
+    this.canvas.requestRenderAll();
+  }
+  /** Swap a full-bleed background picture for a plain colour (undoable) and open the background controls. */
+  replaceBackgroundArt(color?: string) {
+    const a = this.canvas.getActiveObject();
+    if (!isImage(a)) return;
+    this.canvas.discardActiveObject();
+    this.canvas.remove(a);
+    this.canvas.backgroundColor = color ?? this.brandColor;
+    this.canvas.requestRenderAll();
+    this.commit("Replaced background picture with a colour");
+    this.emitBackground();
   }
   toggleWhiteRemoval() {
     const a = this.canvas.getActiveObject();
