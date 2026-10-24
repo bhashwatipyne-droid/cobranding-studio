@@ -1,7 +1,7 @@
 "use client";
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Copy, Eraser, Group, Italic, List, Lock, Minus, MoveDown, MoveUp,
-  Plus, Strikethrough, Sun, Trash2, Type, Underline, Ungroup, Unlock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ImagePlus, CaseUpper, Droplets, Palette,
+  Plus, Strikethrough, Sun, Trash2, Type, Underline, Ungroup, Unlock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ImagePlus, CaseUpper, Droplets,
 } from "lucide-react";
 import { useRef } from "react";
 import { Tip } from "@/components/ui/tooltip";
@@ -117,7 +117,12 @@ export function ContextToolbar() {
           <Slider label="Brightness" value={sel.image.brightness} min={50} max={150} step={5} onChange={(v) => c.setImageFilter("brightness", v)} onDone={() => done("Brightness")} icon={<Sun />} />
           <Slider label="Contrast" value={sel.image.contrast} min={50} max={150} step={5} onChange={(v) => c.setImageFilter("contrast", v)} onDone={() => done("Contrast")} icon={<span className="text-[10px] font-bold">C</span>} />
           <Slider label="Saturation" value={sel.image.saturation} min={0} max={200} step={5} onChange={(v) => c.setImageFilter("saturation", v)} onDone={() => done("Saturation")} icon={<span className="text-[10px] font-bold">S</span>} />
-          <Slider label="Hue shift (recolour)" value={sel.image.hue} min={-180} max={180} step={5} onChange={(v) => c.setImageHue(v)} onDone={() => done("Hue shift")} icon={<Palette />} />
+          <Tip label="Recolour picture">
+            <label className="relative grid size-8 shrink-0 cursor-pointer place-items-center rounded-md hover:bg-accent-soft">
+              <span className="size-5 rounded-full ring-1 ring-ink/20" style={{ background: "conic-gradient(#f43f5e,#f59e0b,#84cc16,#06b6d4,#6366f1,#d946ef,#f43f5e)" }} />
+              <input type="color" aria-label="Recolour picture" defaultValue="#2B2BB5" onChange={(e) => c.recolorImage(e.target.value)} onBlur={() => done("Recoloured picture")} className="absolute inset-0 cursor-pointer opacity-0" />
+            </label>
+          </Tip>
           {sel.image.isBackgroundArt && (
             <button onMouseDown={(e) => e.preventDefault()} onClick={() => c.replaceBackgroundArt()} className="mx-1 shrink-0 rounded-md border border-line-2 px-2.5 py-1.5 text-xs font-semibold text-ink-soft hover:border-accent hover:text-accent">Use a solid colour instead</button>
           )}

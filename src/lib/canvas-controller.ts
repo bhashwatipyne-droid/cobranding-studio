@@ -789,6 +789,23 @@ export class CanvasController {
     a.applyFilters();
     this.canvas.requestRenderAll();
   }
+  /** Recolour a picture so its dominant colour becomes `hex` (simple colour-picker behaviour). */
+  recolorImage(hex: string) {
+    const a = this.canvas.getActiveObject();
+    if (!isImage(a)) return;
+    const c = parseCss(hex);
+    if (!c) return;
+    const dom = this.dominantHue(a);
+    const base = (a.filters ?? []).filter((f) => !(f instanceof filters.HueRotation));
+    a.filters = base; a.applyFilters();
+    const dom0 = this.dominantHue(a) ?? dom;
+    if (dom0 === null) { this.hooks.toast("This picture has no dominant colour to change"); return; }
+    let d = toHsl(c)[0] - dom0;
+    d = ((d + 540) % 360) - 180;
+    a.filters = [...base, new filters.HueRotation({ rotation: d / 180 })];
+    a.applyFilters();
+    this.canvas.requestRenderAll();
+  }
   /** Swap a full-bleed background picture for a plain colour (undoable) and open the background controls. */
   replaceBackgroundArt(color?: string) {
     const a = this.canvas.getActiveObject();
