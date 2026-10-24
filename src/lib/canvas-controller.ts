@@ -590,9 +590,12 @@ export class CanvasController {
       void i;
     });
     this.canvas.getObjects().forEach((o) => {
-      if (!isText(o) || o.keepFont) return;
-      if (o.role === "headline" || o.role === "stat") o.set("fontFamily", kit.fontHeading);
-      else if (o.role === "sub") o.set("fontFamily", kit.fontBody);
+      // The brand's fonts always win for the message itself (headline/sub); keepFont only protects artwork labels.
+      if (!isText(o)) return;
+      if (o.role === "headline" || o.role === "stat") { o.set("fontFamily", kit.fontHeading); o.initDimensions(); }
+      else if (o.role === "sub") { o.set("fontFamily", kit.fontBody); o.initDimensions(); }
+      else return;
+      this.clampToCanvas(o);
     });
     this.canvas.requestRenderAll();
     this.commit("Reapplied cobranding setup");
