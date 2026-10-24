@@ -59,8 +59,6 @@ const ICONS: Record<string, string> = {
 
 const isText = (o: FabricObject | undefined | null): o is Textbox => !!o && o.type?.toLowerCase() === "textbox";
 /** A picture that covers the page (template scene). It must not swallow drag-to-select, so it is click-selected only. */
-/** Fonts the built-in templates use for display type — these follow the brand heading font. */
-const DISPLAY_FONTS = new Set(["Poppins", "Sora", "Bree Serif", "Playfair Display", "Abril Fatface", "Bebas Neue", "Oswald", "Montserrat", "Lobster"]);
 const isBgArt = (o: FabricObject | undefined | null, W: number, H: number) =>
   !!o && o.kind === "image" && (o.layerName === "Background art" || (o.getScaledWidth() >= W * 0.98 && o.getScaledHeight() >= H * 0.9));
 const isImage = (o: FabricObject | undefined | null): o is FabricImage => !!o && o.kind === "image";
@@ -594,8 +592,9 @@ export class CanvasController {
     this.canvas.getObjects().forEach((o) => {
       // Every text follows the brand: the template's display fonts become the heading font, its text fonts the body font.
       if (!isText(o) || o.role === "details" || o.role === "strip" || o.role === "logo" || o.role === "logoText") return;
-      if (!o.brandSlot) o.brandSlot = o.role === "headline" || o.role === "stat" || DISPLAY_FONTS.has(String(o.fontFamily)) ? "heading" : "body";
-      o.set("fontFamily", o.brandSlot === "heading" ? kit.fontHeading : kit.fontBody);
+      // headline/stat → heading font; sub copy → body font; other artwork text by emphasis (bold labels vs. regular text)
+      const heading = o.role === "headline" || o.role === "stat" || (o.role !== "sub" && Number(o.fontWeight) >= 600);
+      o.set("fontFamily", heading ? kit.fontHeading : kit.fontBody);
       o.initDimensions();
       this.clampToCanvas(o);
     });
