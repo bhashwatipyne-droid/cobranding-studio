@@ -222,7 +222,7 @@ export class CanvasController {
       if (Array.isArray(r.objects)) r.objects.forEach(walk);
     };
     walk(json);
-    await Promise.all([...fams].map(ensureFont));
+    await Promise.all([...fams].map((f) => ensureFont(f)));
   }
 
   async loadPage(pageId: string, json: unknown | null) {
@@ -255,7 +255,8 @@ export class CanvasController {
   serialize(): unknown {
     const editing = this.canvas.getObjects().some((o) => isText(o) && o.isEditing);
     const texts = this.canvas.getObjects().filter((o): o is Textbox => isText(o) && !!o.templateText);
-    if (!editing) texts.forEach((t) => { t.styles = {}; });
+    // compliance highlights are never saved; the template's own emphasis (bold phrases etc.) is
+    if (!editing) texts.forEach((t) => { t.styles = {}; this.applyRich(t); });
     const json = this.canvas.toObject(CUSTOM_PROPS);
     if (!editing) texts.forEach((t) => this.applyFlags(t));
     return JSON.parse(JSON.stringify(json));
@@ -384,9 +385,25 @@ export class CanvasController {
   isEditingText() { return this.canvas.getObjects().some((o) => isText(o) && o.isEditing); }
 
   // ───────────────────────── compliance (FR-09) ─────────────────────────
-  private clearFlags(t: Textbox) { t.styles = {}; t.dirty = true; }
+  /** Template-designed emphasis (e.g. a bold coloured phrase inside a light sentence). */
+  private applyRich(t: Textbox) {
+    const txt = t.text ?? "";
+    (t.richPhrases ?? []).forEach((p) => {
+      if (!p.text) return;
+      const style: Record<string, unknown> = {};
+      if (p.fontWeight) style.fontWeight = p.fontWeight;
+      if (p.fill) style.fill = p.fill;
+      let at = txt.indexOf(p.text);
+      while (at >= 0) {
+        t.setSelectionStyles(style, at, at + p.text.length);
+        at = txt.indexOf(p.text, at + p.text.length);
+      }
+    });
+  }
+  private clearFlags(t: Textbox) { t.styles = {}; this.applyRich(t); t.dirty = true; }
   applyFlags(t: Textbox) {
     t.styles = {};
+    this.applyRich(t);
     const spans = computeFlagSpans(t.text ?? "", t.sebiKept ?? []);
     spans.forEach((s) => t.setSelectionStyles(FLAG_STYLE, s.a, s.b));
     t.dirty = true;
@@ -474,10 +491,10 @@ export class CanvasController {
   private roleObj(role: string) { return this.canvas.getObjects().find((o) => o.role === role); }
 
   /** Re-apply logo / details / fonts without regenerating the layout (FR-17). */
-  async reapplyKit(kit: BrandKit, palette: [string, string]) {
+  async reapplyKit(kit: BrandKit, palette: [string, string], layout: LayoutId = "hero") {
     await Promise.all([ensureFont(kit.fontHeading), ensureFont(kit.fontBody)]);
     const objs = this.canvas.getObjects();
-    const fresh = await buildBrand({ kit, applyKit: true, layout: "hero", palette, content: { headline: "", sub: "" }, w: this.W, h: this.H });
+    const fresh = await buildBrand({ kit, applyKit: true, layout, palette, content: { headline: "", sub: "" }, w: this.W, h: this.H });
     const oldStrip = this.roleObj("strip");
     const stripFill = oldStrip?.fill;
     (["strip", "details", "logo"] as const).forEach((role, i) => {
@@ -490,16 +507,17 @@ export class CanvasController {
       void i;
     });
     this.canvas.getObjects().forEach((o) => {
-      if (isText(o) && (o.role === "headline" || o.role === "stat")) o.set("fontFamily", kit.fontHeading);
-      else if (isText(o) && o.role === "sub") o.set("fontFamily", kit.fontBody);
+      if (!isText(o) || o.keepFont) return;
+      if (o.role === "headline" || o.role === "stat") o.set("fontFamily", kit.fontHeading);
+      else if (o.role === "sub") o.set("fontFamily", kit.fontBody);
     });
     this.canvas.requestRenderAll();
     this.commit("Reapplied cobranding setup");
   }
 
   /** Push the kit's colours + fonts through every themed element. */
-  async applyKitToAll(kit: BrandKit, palette: [string, string]) {
-    await this.reapplyKit(kit, palette);
+  async applyKitToAll(kit: BrandKit, palette: [string, string], layout: LayoutId = "hero") {
+    await this.reapplyKit(kit, palette, layout);
     this.canvas.getObjects().forEach((o) => {
       if (o.role === "accent" || o.role === "strip") {
         if (o.fill instanceof Gradient) {

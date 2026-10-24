@@ -22,6 +22,10 @@ declare module "fabric" {
     bullets?: boolean;
     layerName?: string;
     hidden?: boolean;
+    /** keep this text's own font when a brand kit is (re)applied — used by designed templates */
+    keepFont?: boolean;
+    /** designed inline emphasis (phrase → weight/colour); re-applied after every compliance restyle */
+    richPhrases?: RichPhrase[];
   }
   interface SerializedObjectProps {
     id?: string;
@@ -39,12 +43,16 @@ declare module "fabric" {
     bullets?: boolean;
     layerName?: string;
     hidden?: boolean;
+    keepFont?: boolean;
+    richPhrases?: RichPhrase[];
   }
 }
 
+export interface RichPhrase { text: string; fontWeight?: number; fill?: string }
+
 export const CUSTOM_PROPS = [
   "id", "role", "kind", "templateText", "sebiKept", "slotW", "slotH", "focusX", "focusY",
-  "isPlaceholder", "origText", "upper", "bullets", "layerName", "hidden",
+  "isPlaceholder", "origText", "upper", "bullets", "layerName", "hidden", "keepFont", "richPhrases",
   "lockMovementX", "lockMovementY", "lockRotation", "lockScalingX", "lockScalingY", "selectable", "evented",
 ];
 
@@ -73,36 +81,38 @@ export const SIZES: DesignSize[] = [
   { id: "story", label: "Instagram Story · 1080×1920", w: 1080, h: 1920 },
   { id: "linkedin", label: "LinkedIn Post · 1200×627", w: 1200, h: 627 },
   { id: "facebook", label: "Facebook Post · 1200×630", w: 1200, h: 630 },
+  { id: "portrait", label: "Instagram Portrait · 1080×1350", w: 1080, h: 1350 },
 ];
 export const sizeById = (id: string) => SIZES.find((s) => s.id === id) ?? SIZES[0];
 
 // ── fonts ──
-const loadedFonts = new Set(["Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia"]);
+const loadedFonts = new Set(["Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia", "Bree Serif"]);
+/** Google families that only ship a regular weight — asking for wght@… makes the whole request fail. */
+const SINGLE_WEIGHT = new Set(["Bree Serif", "Bebas Neue", "Abril Fatface"]);
 export const FONT_CHOICES = [
   "Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia",
   "Montserrat", "Open Sans", "Nunito", "Raleway", "Oswald", "Work Sans", "Rubik", "Karla",
   "Quicksand", "Manrope", "DM Sans", "Space Grotesk", "Fira Sans", "PT Sans", "Ubuntu",
   "Josefin Sans", "Cabin", "Barlow", "Mulish", "Heebo", "Libre Baskerville", "Crimson Text",
   "Bitter", "Domine", "Zilla Slab", "Archivo", "Epilogue", "Outfit", "Plus Jakarta Sans",
-  "Figtree", "Urbanist", "Bebas Neue", "Abril Fatface",
+  "Figtree", "Urbanist", "Bebas Neue", "Abril Fatface", "Bree Serif",
 ];
 
 /** Load a Google font and wait until the canvas can actually draw with it. */
-export async function ensureFont(family: string) {
+export async function ensureFont(family: string, weights: number[] = [300, 400, 500, 600, 700, 800]) {
   if (typeof document === "undefined" || !family) return;
   if (!loadedFonts.has(family) && family !== "Georgia") {
     loadedFonts.add(family);
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}:wght@400;600;700;800&display=swap`;
+    const fam = family.replace(/ /g, "+");
+    link.href = SINGLE_WEIGHT.has(family)
+      ? `https://fonts.googleapis.com/css2?family=${fam}&display=swap`
+      : `https://fonts.googleapis.com/css2?family=${fam}:wght@400;600;700;800&display=swap`;
     document.head.appendChild(link);
   }
   try {
-    await Promise.all([
-      document.fonts.load(`400 24px "${family}"`),
-      document.fonts.load(`700 24px "${family}"`),
-      document.fonts.load(`800 24px "${family}"`),
-    ]);
+    await Promise.all(weights.map((w) => document.fonts.load(`${w} 24px "${family}"`)));
   } catch {
     /* offline / blocked — canvas falls back to the system font */
   }

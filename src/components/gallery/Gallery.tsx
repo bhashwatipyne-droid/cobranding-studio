@@ -3,13 +3,15 @@ import { ChevronDown, ChevronLeft, ChevronRight, Cloud, LayoutGrid, List, Search
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { sizeById } from "@/lib/fabric-setup";
 import { gradientCss } from "@/lib/templates";
 import { cn } from "@/lib/utils";
 import { useStudio } from "@/store/studio-store";
 import type { TemplateDef } from "@/lib/types";
 
-const TYPES = ["All types", "Infographic", "Carousel", "Reel Cover", "Video"];
-const TOPICS = ["All categories", "Mutual Funds", "Tax Planning", "Market Updates"];
+const TYPES = ["All types", "Infographic", "Interactive", "Post", "Carousel", "Reel Cover", "Video"];
+const STYLES = ["All styles", "Minimalist"];
+const TOPICS = ["All categories", "Mutual Funds", "Tax Planning", "Market Updates", "Festivals"];
 const DATES = ["Anytime", "Today", "Last 7 days", "Last 30 days"];
 
 function ago(iso: string) {
@@ -83,11 +85,12 @@ export function Gallery() {
   const templates = useMemo(() => {
     const q = s.query.trim().toLowerCase();
     return s.templates.map((t, i) => ({ t, i })).filter(({ t }) =>
-      (!q || t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.topic.toLowerCase().includes(q)) &&
+      (!q || t.name.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.topic.toLowerCase().includes(q) || (t.style ?? "").toLowerCase().includes(q)) &&
       (s.filters.type === "All types" || t.category === s.filters.type) &&
-      (s.filters.topic === "All categories" || t.topic === s.filters.topic),
+      (s.filters.topic === "All categories" || t.topic === s.filters.topic) &&
+      (s.filters.style === "All styles" || t.style === s.filters.style),
     );
-  }, [s.templates, s.query, s.filters.type, s.filters.topic]);
+  }, [s.templates, s.query, s.filters.type, s.filters.topic, s.filters.style]);
 
   const recents = useMemo(() => {
     const now = Date.now();
@@ -129,6 +132,7 @@ export function Gallery() {
         <div className="flex flex-wrap justify-center gap-2">
           <FilterPill label="Type" options={TYPES} value={s.filters.type} onPick={(v) => s.setFilter("type", v)} />
           <FilterPill label="Category" options={TOPICS} value={s.filters.topic} onPick={(v) => s.setFilter("topic", v)} />
+          <FilterPill label="Style" options={STYLES} value={s.filters.style} onPick={(v) => s.setFilter("style", v)} />
           <FilterPill label="Brand kit" options={["All brand kits", ...kitList.map((k) => k.label)]} value={s.filters.brand} onPick={(v) => s.setFilter("brand", v)} />
           <FilterPill label="Date modified" options={DATES} value={s.filters.date} onPick={(v) => s.setFilter("date", v)} />
         </div>
@@ -235,7 +239,7 @@ function TemplateModal() {
             </div>
             <div className="w-[56%] px-8 py-[30px]">
               <h2 className="mb-3 text-xl">{t.name}</h2>
-              <div className="mb-[18px] flex flex-wrap gap-[7px]">{[t.category, t.topic, "Instagram Post · 1080 × 1080"].map((p) => <span key={p} className="rounded-full bg-accent-soft px-[11px] py-[5px] text-[10.5px] font-bold uppercase tracking-wider text-accent">{p}</span>)}</div>
+              <div className="mb-[18px] flex flex-wrap gap-[7px]">{[t.category, t.topic, ...(t.style ? [t.style] : []), sizeById(t.sizeId ?? "post").label.replace(/×/g, " × ")].map((p) => <span key={p} className="rounded-full bg-accent-soft px-[11px] py-[5px] text-[10.5px] font-bold uppercase tracking-wider text-accent">{p}</span>)}</div>
               <p className="mb-6 text-[13.5px] leading-relaxed text-ink-soft">A ready-to-edit template — swap the headline, image, and details, or use it as-is with your brand already applied.</p>
               <Button size="lg" className="h-[46px] w-full text-sm" onClick={chooseTemplate}>Co-brand this template</Button>
               <Button variant="outline" className="mt-2 w-full" onClick={() => openModal(null)}>Cancel</Button>
