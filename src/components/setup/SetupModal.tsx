@@ -12,6 +12,16 @@ import { detectPalette, fileToDataUrl, processLogoDataUrl, svgToDataUrl } from "
 import { cn } from "@/lib/utils";
 import { useStudio } from "@/store/studio-store";
 
+/** Swatches follow the brand colours (no leftovers from an older palette): primary, secondary, text and a few blends. */
+function brandSwatches(a: string, b: string, t: string) {
+  const mix = (x: string, y: string, f: number) => {
+    const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    if (!/^#[0-9a-f]{6}$/i.test(x) || !/^#[0-9a-f]{6}$/i.test(y)) return x;
+    const [r1, g1, b1] = p(x), [r2, g2, b2] = p(y);
+    return `#${[[r1, r2], [g1, g2], [b1, b2]].map(([u, v]) => Math.round(u + (v - u) * f).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+  };
+  return Array.from(new Set([a, b, t, mix(a, b, 0.5), mix(b, "#FFFFFF", 0.55), mix(a, "#FFFFFF", 0.7)].map((c) => c.toUpperCase())));
+}
 const Verified = () => <span className="absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700"><BadgeCheck className="size-3" />Verified</span>;
 
 const PRESETS: { id: string; label: string; pos: LogoPos; details: "top" | "bottom" }[] = [
@@ -100,7 +110,7 @@ export function SetupModal() {
 
   async function save() {
     setSaving(true);
-    const kit: BrandKit = { ...draft, setupComplete: true, swatches: Array.from(new Set([draft.color, draft.secondary, draft.textColor, ...draft.swatches])).slice(0, 6) };
+    const kit: BrandKit = { ...draft, setupComplete: true, swatches: brandSwatches(draft.color, draft.secondary, draft.textColor) };
     await saveKit(kit);
     setSaving(false);
     setSetupOpen(false);

@@ -661,8 +661,21 @@ export class CanvasController {
     };
     this.walkArt((o, w) => each(o, (css, wt) => uses.push({ css, weight: wt }), w));
     const map = buildRemap(uses, kit.color, kit.secondary);
-    if (bg instanceof Gradient) bg.colorStops.forEach((c) => { c.color = map(c.color); });
-    else if (typeof bg === "string") this.canvas.backgroundColor = map(bg);
+    if (bg instanceof Gradient) {
+      // A coloured gradient page runs between the two brand colours: its lightest stop takes the secondary, its darkest the primary.
+      const mix = (a: string, b: string, f: number) => {
+        const x = parseCss(a), y = parseCss(b);
+        if (!x || !y) return a;
+        const ch = (u: number, v: number) => Math.round(u + (v - u) * f).toString(16).padStart(2, "0");
+        return `#${ch(x.r, y.r)}${ch(x.g, y.g)}${ch(x.b, y.b)}`;
+      };
+      const ls = bg.colorStops.map((c) => { const q = parseCss(c.color); return q ? toHsl(q) : null; });
+      const sat = ls.some((h) => h && h[1] >= 0.2 && h[2] > 0.08 && h[2] < 0.93);
+      const vals = ls.map((h) => h?.[2] ?? 0);
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      if (sat && hi - lo > 0.12) bg.colorStops.forEach((c, i) => { c.color = mix(kit.color, kit.secondary, (vals[i] - lo) / (hi - lo)); });
+      else bg.colorStops.forEach((c) => { c.color = map(c.color); });
+    } else if (typeof bg === "string") this.canvas.backgroundColor = map(bg);
     const bgNow = this.canvas.backgroundColor instanceof Gradient ? this.canvas.backgroundColor.colorStops.map((c) => c.color) : [String(this.canvas.backgroundColor || "#ffffff")];
     this.walkArt((o) => {
       if (o.fill instanceof Gradient) o.fill.colorStops.forEach((c) => { c.color = map(c.color); });
