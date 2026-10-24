@@ -1,16 +1,26 @@
 "use client";
-import { Globe, Loader2, Lock, Plus, RefreshCw, Upload, Wand2, X } from "lucide-react";
+import { BadgeCheck, Globe, Loader2, Plus, Upload, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { FONT_CHOICES } from "@/lib/fabric-setup";
+import { FONT_CHOICES, SIZES, sizeById } from "@/lib/fabric-setup";
 import { POS_LABEL, POS_OPTIONS, combineDetails } from "@/lib/templates";
 import type { BrandKit, LogoPos } from "@/lib/types";
 import { detectPalette, fileToDataUrl, processLogoDataUrl, svgToDataUrl } from "@/lib/vectorize";
 import { cn } from "@/lib/utils";
 import { useStudio } from "@/store/studio-store";
+
+const Verified = () => <span className="absolute right-2.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700"><BadgeCheck className="size-3" />Verified</span>;
+
+const PRESETS: { id: string; label: string; pos: LogoPos; details: "top" | "bottom" }[] = [
+  { id: "classic", label: "Classic", pos: "top-left", details: "bottom" },
+  { id: "modern", label: "Modern", pos: "top-right", details: "bottom" },
+  { id: "minimal", label: "Minimal", pos: "bottom-left", details: "bottom" },
+  { id: "badge", label: "Centered Badge", pos: "top-center", details: "bottom" },
+  { id: "bold", label: "Bold Header", pos: "top-left", details: "top" },
+];
 
 const Field = ({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) => (
   <label className="block">
@@ -28,6 +38,7 @@ export function SetupModal() {
   const [review, setReview] = useState<{ svg: string; original: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [pvSize, setPvSize] = useState("post");
 
   useEffect(() => { if (setupOpen) { setDraft(structuredClone(kits[activeKitKey])); setReview(null); setSite(""); } }, [setupOpen, activeKitKey, kits]);
   const set = <K extends keyof BrandKit>(k: K, v: BrandKit[K]) => setDraft((d) => ({ ...d, [k]: v }));
@@ -156,7 +167,14 @@ export function SetupModal() {
             </section>
 
             <section>
-              <h4 className="mb-2.5 text-sm">4 · Logo position</h4>
+              <h4 className="mb-2.5 text-sm">4 · Placement <span className="font-medium text-ink-faint">(preset optional)</span></h4>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {PRESETS.map((pr) => {
+                  const on = draft.position === pr.pos && draft.detailsPosition === pr.details;
+                  return <button key={pr.id} onClick={() => setDraft((d) => ({ ...d, position: pr.pos, detailsPosition: pr.details }))} aria-pressed={on} className={cn("rounded-full border px-3.5 py-1.5 text-xs font-semibold", on ? "border-accent bg-accent-soft text-accent" : "border-line-2 text-ink-soft hover:border-accent")}>{pr.label}</button>;
+                })}
+              </div>
+              <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-soft">Logo position</div>
               <div className="grid w-[168px] grid-cols-3 gap-1.5">
                 {POS_OPTIONS.map((p) => (
                   <button key={p} title={POS_LABEL[p]} aria-label={POS_LABEL[p]} aria-pressed={draft.position === p} onClick={() => set("position", p as LogoPos)} className={cn("grid h-11 place-items-center rounded-md border transition", draft.position === p ? "border-accent bg-accent text-white" : "border-line-2 bg-white hover:border-accent")}>
@@ -169,8 +187,8 @@ export function SetupModal() {
             <section>
               <h4 className="mb-2.5 text-sm">5 · Company details <span className="font-medium text-ink-faint">(shown in the header/footer strip)</span></h4>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Company name"><div className="relative"><Input value={draft.companyName} onChange={(e) => set("companyName", e.target.value)} /></div></Field>
-                <Field label="SEBI registration (RRN)" hint="Required on every investor-facing post."><div className="relative"><Input value={draft.rrn} onChange={(e) => set("rrn", e.target.value)} /><Lock className="absolute right-3 top-3 size-4 text-ink-faint" /></div></Field>
+                <Field label="Company name"><div className="relative"><Input value={draft.companyName} readOnly disabled className="pr-24" /><Verified /></div></Field>
+                <Field label="SEBI registration (RRN)" hint="Verified from your account — change it in account settings."><div className="relative"><Input value={draft.rrn} readOnly disabled className="pr-24" /><Verified /></div></Field>
                 <Field label="Email"><Input value={draft.email} onChange={(e) => set("email", e.target.value)} placeholder="care@company.com" /></Field>
                 <Field label="Mobile"><Input value={draft.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="+91 …" /></Field>
                 <Field label="Website"><Input value={draft.website} onChange={(e) => set("website", e.target.value)} placeholder="company.com" /></Field>
@@ -182,7 +200,7 @@ export function SetupModal() {
                   <Button size="icon" variant="ghost" aria-label="Remove field" onClick={() => set("otherFields", draft.otherFields.filter((_, k) => k !== i))}><X /></Button>
                 </div>
               ))}
-              {draft.otherFields.length < 4 && <Button size="sm" variant="ghost" className="mt-2" onClick={() => set("otherFields", [...draft.otherFields, ""])}><Plus />Add field</Button>}
+              {draft.otherFields.length < 3 && <Button size="sm" variant="ghost" className="mt-2" onClick={() => set("otherFields", [...draft.otherFields, ""])}><Plus />Add field</Button>}
               <div className="mt-3 flex gap-2">
                 {(["top", "bottom"] as const).map((p) => (
                   <button key={p} onClick={() => set("detailsPosition", p)} className={cn("rounded-full border px-4 py-1.5 text-xs font-semibold", draft.detailsPosition === p ? "border-accent bg-accent-soft text-accent" : "border-line-2 text-ink-soft")}>Strip at {p}</button>
@@ -197,17 +215,18 @@ export function SetupModal() {
           </div>
           <div className="flex justify-end gap-2 border-t border-line px-8 py-4">
             <Button variant="outline" onClick={() => setSetupOpen(false)}>Cancel</Button>
-            <Button onClick={() => void save()} disabled={saving || !draft.companyName.trim()}>{saving ? <Loader2 className="animate-spin" /> : <RefreshCw className="hidden" />}Save &amp; apply</Button>
+            <Button onClick={() => void save()} disabled={saving || !draft.companyName.trim()}>{saving && <Loader2 className="animate-spin" />}Save setup</Button>
           </div>
         </div>
 
         <aside className="hidden w-[300px] shrink-0 border-l border-line bg-surface-2 p-6 lg:block">
-          <div className="mb-3 text-[11px] font-bold uppercase tracking-wider text-ink-soft">Live preview</div>
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-soft">Live preview</div>
+          <select aria-label="Preview format" value={pvSize} onChange={(e) => setPvSize(e.target.value)} className="mb-3 h-9 w-full rounded-md border border-line-2 bg-white px-2 text-xs">{SIZES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</select>
           <div className="overflow-hidden rounded-lg shadow-3" style={{ background: `linear-gradient(135deg, ${draft.color}, ${draft.secondary})` }}>
             <div className="flex h-9 items-center px-3" style={{ background: "rgba(0,0,0,.18)" }}>
               <span className="truncate text-[9px] font-semibold text-white/90">{combineDetails(draft) || "Company details appear here"}</span>
             </div>
-            <div className="relative grid aspect-square place-items-center p-6 text-center text-[17px] font-extrabold leading-tight text-white" style={{ fontFamily: draft.fontHeading }}>
+            <div style={{ aspectRatio: `${sizeById(pvSize).w} / ${sizeById(pvSize).h}`, fontFamily: draft.fontHeading }} className="relative grid max-h-[420px] place-items-center p-6 text-center text-[17px] font-extrabold leading-tight text-white">
               Your headline goes here
               <div className={cn("absolute rounded-md bg-white p-1.5 shadow-2", draft.position.startsWith("top") ? "top-3" : draft.position.startsWith("bottom") ? "bottom-3" : "top-1/2 -translate-y-1/2", draft.position.endsWith("left") ? "left-3" : draft.position.endsWith("right") ? "right-3" : draft.position === "center" ? "left-1/2 -translate-x-1/2" : "left-1/2 -translate-x-1/2")}>
                 {logoPreview ? <img src={logoPreview} alt="" className="h-6 max-w-16 object-contain" /> : <span className="text-[9px] font-bold" style={{ color: draft.color }}>{draft.logoName}</span>}

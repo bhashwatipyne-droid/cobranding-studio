@@ -109,7 +109,17 @@ export async function vectorizeRaster(dataUrl: string): Promise<string> {
   const corners = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)];
   const plateIsBlank = corners.every(([r, g, b, a]) => a < 20 || nearWhite(r, g, b));
 
-  const raw = ImageTracer.imagedataToSVG(data, {
+  // 1) server tracer (vtracer) — cleaner curves; 2) in-browser imagetracer if the API is unavailable
+  let raw: string | null = null;
+  try {
+    const flat = document.createElement("canvas");
+    flat.width = w; flat.height = h;
+    const fctx = flat.getContext("2d")!;
+    fctx.fillStyle = "#FFFFFF"; fctx.fillRect(0, 0, w, h); fctx.drawImage(img, 0, 0, w, h);
+    const res = await fetch("/api/vectorize", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dataUrl: flat.toDataURL("image/png") }) });
+    if (res.ok) raw = ((await res.json()) as { svg?: string }).svg ?? null;
+  } catch { /* fall back */ }
+  if (!raw) raw = ImageTracer.imagedataToSVG(data, {
     numberofcolors: 10,
     colorsampling: 2,
     ltres: 1,

@@ -53,6 +53,7 @@ export function ContextToolbar() {
 
   return (
     <div className="flex h-12 items-center gap-0.5 overflow-x-auto border-b border-line bg-surface px-3" role="toolbar" aria-label="Selection tools">
+      {sel.count > 1 && <span className="mr-2 shrink-0 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">{sel.count} elements selected</span>}
       {isTxt && t && (
         <>
           <select aria-label="Font" value={t.fontFamily} onChange={(e) => c.setFont(e.target.value)} className="mr-1 h-8 w-32 shrink-0 rounded-md border border-line-2 bg-white px-1.5 text-xs">
@@ -100,9 +101,9 @@ export function ContextToolbar() {
           <Btn label="Pan down" onClick={() => c.nudgeImage(0, 30)}><ArrowDown /></Btn>
           <Btn label="Pan left" onClick={() => c.nudgeImage(-30, 0)}><ArrowLeft /></Btn>
           <Btn label="Pan right" onClick={() => c.nudgeImage(30, 0)}><ArrowRight /></Btn>
-          <Slider label="Brightness" value={sel.image.brightness} min={-0.5} max={0.5} step={0.05} onChange={(v) => c.setImageFilter("brightness", v)} onDone={() => done("Brightness")} icon={<Sun />} />
-          <Slider label="Contrast" value={sel.image.contrast} min={-0.5} max={0.5} step={0.05} onChange={(v) => c.setImageFilter("contrast", v)} onDone={() => done("Contrast")} icon={<span className="text-[10px] font-bold">C</span>} />
-          <Slider label="Saturation" value={sel.image.saturation} min={-1} max={1} step={0.05} onChange={(v) => c.setImageFilter("saturation", v)} onDone={() => done("Saturation")} icon={<span className="text-[10px] font-bold">S</span>} />
+          <Slider label="Brightness" value={sel.image.brightness} min={50} max={150} step={5} onChange={(v) => c.setImageFilter("brightness", v)} onDone={() => done("Brightness")} icon={<Sun />} />
+          <Slider label="Contrast" value={sel.image.contrast} min={50} max={150} step={5} onChange={(v) => c.setImageFilter("contrast", v)} onDone={() => done("Contrast")} icon={<span className="text-[10px] font-bold">C</span>} />
+          <Slider label="Saturation" value={sel.image.saturation} min={0} max={200} step={5} onChange={(v) => c.setImageFilter("saturation", v)} onDone={() => done("Saturation")} icon={<span className="text-[10px] font-bold">S</span>} />
           <Btn label="Remove white background" active={sel.image.whiteRemoved} onClick={() => c.toggleWhiteRemoval()}><Eraser /></Btn>
           <Sep />
         </>

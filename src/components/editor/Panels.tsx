@@ -4,6 +4,7 @@ import { useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { SIZES } from "@/lib/fabric-setup";
+import { STOCK_PHOTOS } from "@/lib/stock";
 import { gradientCss } from "@/lib/templates";
 import { fileToDataUrl, shrinkPhoto } from "@/lib/vectorize";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,9 @@ export function Panels() {
       {panel === "brand" && (
         <>
           <H>Brand kit</H>
+          <select aria-label="Active brand kit" value={doc.kitKey} onChange={(e) => void s.switchDocKit(e.target.value)} className="mb-2.5 h-10 w-full rounded-md border border-line-2 bg-white px-2 text-[13px] font-semibold">
+            {Object.values(kits).map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+          </select>
           <div className="rounded-lg border border-line-2 p-3">
             <div className="mb-2 flex items-center gap-2"><span className="size-5 rounded-full" style={{ background: kit.color }} /><b className="text-[13px]">{kit.label}</b></div>
             <div className="flex gap-1.5">{kit.swatches.map((sw) => <button key={sw} aria-label={`Apply ${sw}`} title={sw} onClick={() => c.setColor(sw)} className="size-7 rounded-md ring-1 ring-ink/10" style={{ background: sw }} />)}</div>
@@ -47,6 +51,7 @@ export function Panels() {
             <Button className="w-full" onClick={() => void s.reapplySetup()}>Apply brand to this post</Button>
             <Button className="w-full" variant="outline" onClick={() => void s.applyKitAll()}>Recolour all elements</Button>
             <Button className="w-full" variant="ghost" onClick={() => s.setSetupOpen(true)}>Edit cobranding setup</Button>
+            <Button className="w-full" variant="outline" onClick={() => s.setShareOpen(true)}>Save as template…</Button>
           </div>
           {!kit.setupComplete && <p className="mt-3 rounded-md bg-amber-50 p-3 text-xs text-warn-ink">This kit isn&apos;t set up yet. Set it up to place your logo and RRN automatically.</p>}
         </>
@@ -121,6 +126,12 @@ export function Panels() {
               </div>
             ))}
           </div>
+          <H>Stock photos (demo)</H>
+          <div className="grid grid-cols-2 gap-2">
+            {STOCK_PHOTOS.map((u, i) => (
+              <button key={i} aria-label={`Stock photo ${i + 1}`} onClick={() => { if (s.sel?.kind === "image") void c.setImageOnSelection(u); else s.toast("Select an image slot on the canvas first"); }} className="overflow-hidden rounded-lg border border-line hover:border-accent"><img src={u} alt="" className="aspect-[4/3] w-full object-cover" /></button>
+            ))}
+          </div>
         </>
       )}
 
@@ -144,14 +155,15 @@ export function Panels() {
       {panel === "overlay" && (
         <>
           <H>Video overlay</H>
-          <p className="mb-3 text-xs text-ink-soft">Branded bars shown across the whole video, on top of your footage. First and last frames are designed on the canvas.</p>
+          <p className="mb-3 rounded-md bg-amber-50 p-2.5 text-xs text-warn-ink">Branding only — no video editing happens here. Bars sit on top of your finished video; they are not a rendered video.</p>
           {(["header", "footer"] as const).map((k) => (
             <div key={k} className="mb-2 flex items-center justify-between rounded-lg border border-line-2 px-3 py-2.5">
               <span className="text-[13px] font-semibold capitalize">{k} bar (logo &amp; details)</span>
               <Switch checked={doc.overlay[k]} onCheckedChange={(v) => s.setOverlay(k, v)} aria-label={k} />
             </div>
           ))}
-          <Button className="mt-2 w-full" variant="soft" onClick={() => s.setVideoPreview(true)}>Preview video frames</Button>
+          <Button className="mt-2 w-full" variant="outline" onClick={() => { void s.switchPage(0); s.setOverlayView(true); }}>View overlay on first frame</Button>
+          <Button className="mt-2 w-full" variant="soft" onClick={() => s.setVideoPreview(true)}>Preview playback (demo)</Button>
         </>
       )}
 

@@ -92,6 +92,7 @@ interface StudioState {
   applyLayoutFrom(tpl: TemplateDef): Promise<void>;
   reapplySetup(): Promise<void>;
   applyKitAll(): Promise<void>;
+  switchDocKit(key: string): Promise<void>;
   onChange(): void;
   flushSave(opts?: { library?: boolean }): Promise<void>;
   saveAsTemplate(name: string): Promise<void>;
@@ -294,6 +295,15 @@ export const useStudio = create<StudioState>((set, get) => ({
     controller.brandColor = kit.color;
     await controller.applyKitToAll(kit, doc.palette ?? BUILTIN_TEMPLATES[0].palette);
     get().toast("Brand kit applied to all elements");
+  },
+
+  async switchDocKit(key) {
+    const { doc, kits } = get();
+    if (!doc || !kits[key]) return;
+    set({ doc: { ...doc, kitKey: key }, activeKitKey: key });
+    if (!kits[key].setupComplete) { get().toast(`${kits[key].label} isn't set up yet — opening setup`); set({ setupOpen: true }); return; }
+    await get().applyKitAll();
+    get().onChange();
   },
 
   onChange() {

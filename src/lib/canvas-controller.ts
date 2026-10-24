@@ -163,9 +163,14 @@ export class CanvasController {
       const t = e.target as FabricObject;
       if (isText(t)) {
         if (t.upper) t.origText = t.text;
-        if (t.templateText) { this.applyFlags(t); this.pushCompliance(t, false); }
+        let label = "Edited text";
+        if (t.templateText) {
+          const f = computeFlagSpans(t.text ?? "", t.sebiKept ?? []);
+          label = f.length ? `Edited template text — flagged: ${[...new Set(f.map((x) => x.raw.toLowerCase()))].join(", ")}` : "Edited template text";
+          this.applyFlags(t); this.pushCompliance(t, false);
+        }
         c.requestRenderAll();
-        this.commit("Edited text");
+        this.commit(label);
       }
     });
   }
