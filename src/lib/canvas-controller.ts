@@ -69,6 +69,7 @@ function paint(o: FabricObject, color: string) {
     o.getObjects().forEach((c) => paint(c, color));
     return;
   }
+  o.brandSrc = undefined;
   const f = o.fill;
   if (f && f !== "none" && f !== "transparent") o.set("fill", color);
   else if (o.stroke) o.set("stroke", color);
@@ -266,6 +267,7 @@ export class CanvasController {
   }
 
   async loadPage(pageId: string, json: unknown | null) {
+    this.bgSrc = null;
     this.pageId = pageId;
     this.restoring = true;
     this.canvas.discardActiveObject();
@@ -368,6 +370,7 @@ export class CanvasController {
     this.hooks.onSelection({ count: 0, ids: [], kind: "background", locked: false, opacity: 1, isGroup: false, bg: { from, to, hasImage: !!this.canvas.backgroundImage } });
   }
   setBackgroundColors(from: string, to: string | null) {
+    this.bgSrc = null;
     this.canvas.backgroundColor = to
       ? new Gradient({ type: "linear", gradientUnits: "pixels", coords: { x1: 0, y1: 0, x2: this.W, y2: this.H }, colorStops: [{ offset: 0, color: from }, { offset: 1, color: to }] })
       : from;
@@ -377,6 +380,8 @@ export class CanvasController {
     this.bgTimer = setTimeout(() => this.commit("Changed background"), 400);
   }
   private bgTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The page background as the template drew it (before any brand); reset whenever the page is loaded or edited by hand. */
+  private bgSrc: string[] | null = null;
   removeBackgroundImage() {
     this.canvas.backgroundImage = undefined;
     this.canvas.requestRenderAll();
@@ -647,19 +652,33 @@ export class CanvasController {
     this.canvas.getObjects().forEach(rec);
   }
 
+  /** The template's own colours for an object (captured once, before any brand touches it). */
+  private srcOf(o: FabricObject) {
+    if (!o.brandSrc) {
+      o.brandSrc = {
+        fill: o.fill instanceof Gradient ? o.fill.colorStops.map((s) => s.color) : typeof o.fill === "string" && o.fill ? o.fill : null,
+        stroke: typeof o.stroke === "string" && o.stroke ? o.stroke : null,
+        rich: isText(o) ? (o.richPhrases ?? []).map((p) => p.fill ?? null) : [],
+      };
+    }
+    return o.brandSrc;
+  }
+
   /** Remap every saturated colour in the design (shapes, lines, icons, text emphasis, background) onto the kit palette. */
   private remapPalette(kit: BrandKit) {
     const uses: ColorUse[] = [];
     const bg = this.canvas.backgroundColor;
-    const bgStops = bg instanceof Gradient ? bg.colorStops.map((c) => c.color) : typeof bg === "string" ? [bg] : [];
+    // the page background's original colours are remembered too, so switching brand kits works from the template, not the last brand
+    if (!this.bgSrc) this.bgSrc = bg instanceof Gradient ? bg.colorStops.map((c) => c.color) : typeof bg === "string" && bg ? [bg] : [];
+    const bgStops = this.bgSrc;
     bgStops.forEach((c) => uses.push({ css: c, weight: (this.W * this.H) / 800 }));
-    const each = (o: FabricObject, f: (css: string, wt: number) => void, w: number) => {
-      if (o.fill instanceof Gradient) o.fill.colorStops.forEach((c) => f(c.color, w));
-      else if (typeof o.fill === "string" && o.fill) f(o.fill, w);
-      if (typeof o.stroke === "string" && o.stroke) f(o.stroke, w * 0.3 + (o.strokeWidth ?? 0) * 20);
-      if (isText(o)) (o.richPhrases ?? []).forEach((p) => { if (p.fill) f(p.fill, 40); });
-    };
-    this.walkArt((o, w) => each(o, (css, wt) => uses.push({ css, weight: wt }), w));
+    this.walkArt((o, w) => {
+      const src = this.srcOf(o);
+      if (Array.isArray(src.fill)) src.fill.forEach((c) => uses.push({ css: c, weight: w }));
+      else if (src.fill) uses.push({ css: src.fill, weight: w });
+      if (src.stroke) uses.push({ css: src.stroke, weight: w * 0.3 + (o.strokeWidth ?? 0) * 20 });
+      src.rich.forEach((c) => { if (c) uses.push({ css: c, weight: 40 }); });
+    });
     const map = buildRemap(uses, kit.color, kit.secondary);
     if (bg instanceof Gradient) {
       // A coloured gradient page runs between the two brand colours: its lightest stop takes the secondary, its darkest the primary.
@@ -669,19 +688,23 @@ export class CanvasController {
         const ch = (u: number, v: number) => Math.round(u + (v - u) * f).toString(16).padStart(2, "0");
         return `#${ch(x.r, y.r)}${ch(x.g, y.g)}${ch(x.b, y.b)}`;
       };
-      const ls = bg.colorStops.map((c) => { const q = parseCss(c.color); return q ? toHsl(q) : null; });
+      const ls = bgStops.map((c) => { const q = parseCss(c); return q ? toHsl(q) : null; });
       const sat = ls.some((h) => h && h[1] >= 0.2 && h[2] > 0.08 && h[2] < 0.93);
       const vals = ls.map((h) => h?.[2] ?? 0);
       const lo = Math.min(...vals), hi = Math.max(...vals);
-      if (sat && hi - lo > 0.12) bg.colorStops.forEach((c, i) => { c.color = mix(kit.color, kit.secondary, (vals[i] - lo) / (hi - lo)); });
-      else bg.colorStops.forEach((c) => { c.color = map(c.color); });
-    } else if (typeof bg === "string") this.canvas.backgroundColor = map(bg);
+      const branded = sat || hi - lo > 0.3; // a strongly graded (even grey) page also follows the brand
+      bg.colorStops.forEach((c, i) => {
+        const s0 = bgStops[i] ?? c.color;
+        c.color = branded && hi - lo > 0.12 ? mix(kit.color, kit.secondary, (vals[i] - lo) / (hi - lo)) : map(s0);
+      });
+    } else if (typeof bg === "string" && bgStops[0]) this.canvas.backgroundColor = map(bgStops[0]);
     const bgNow = this.canvas.backgroundColor instanceof Gradient ? this.canvas.backgroundColor.colorStops.map((c) => c.color) : [String(this.canvas.backgroundColor || "#ffffff")];
     this.walkArt((o) => {
-      if (o.fill instanceof Gradient) o.fill.colorStops.forEach((c) => { c.color = map(c.color); });
-      else if (typeof o.fill === "string" && o.fill) o.set("fill", map(o.fill));
-      if (typeof o.stroke === "string" && o.stroke) o.set("stroke", map(o.stroke));
-      if (isText(o)) (o.richPhrases ?? []).forEach((p) => { if (p.fill) p.fill = this.legible(map(p.fill), bgNow); });
+      const src = this.srcOf(o);
+      if (o.fill instanceof Gradient && Array.isArray(src.fill)) o.fill.colorStops.forEach((c, i) => { c.color = map(src.fill![i] ?? c.color); });
+      else if (typeof src.fill === "string") o.set("fill", map(src.fill));
+      if (src.stroke) o.set("stroke", map(src.stroke));
+      if (isText(o)) (o.richPhrases ?? []).forEach((p, i) => { const s0 = src.rich[i]; if (s0) p.fill = this.legible(map(s0), bgNow); });
       o.dirty = true;
     });
     // text on a re-coloured shape/background must stay readable: fall back to white or ink when contrast drops under 3:1
@@ -966,6 +989,7 @@ export class CanvasController {
   }
   setBorderColor(c: string) {
     this.borderTargets().forEach((t) => {
+      t.brandSrc = undefined;
       t.set({ stroke: c, strokeUniform: true, strokeWidth: (t.strokeWidth ?? 0) > 0 ? t.strokeWidth : 2 });
       t.dirty = true;
     });

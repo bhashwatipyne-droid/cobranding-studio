@@ -26,6 +26,8 @@ declare module "fabric" {
     keepFont?: boolean;
     /** which brand font this text follows: decided once from the template's own hierarchy */
     brandSlot?: "heading" | "body";
+    /** the template's original colours, kept so re-branding always starts from them (never from an earlier brand) */
+    brandSrc?: { fill: string | string[] | null; stroke: string | null; rich: (string | null)[] };
     /** designed inline emphasis (phrase → weight/colour); re-applied after every compliance restyle */
     richPhrases?: RichPhrase[];
   }
@@ -48,6 +50,8 @@ declare module "fabric" {
     keepFont?: boolean;
     /** which brand font this text follows: decided once from the template's own hierarchy */
     brandSlot?: "heading" | "body";
+    /** the template's original colours, kept so re-branding always starts from them (never from an earlier brand) */
+    brandSrc?: { fill: string | string[] | null; stroke: string | null; rich: (string | null)[] };
     richPhrases?: RichPhrase[];
   }
 }
@@ -56,7 +60,7 @@ export interface RichPhrase { text: string; fontWeight?: number; fill?: string }
 
 export const CUSTOM_PROPS = [
   "id", "role", "kind", "templateText", "sebiKept", "slotW", "slotH", "focusX", "focusY",
-  "isPlaceholder", "origText", "upper", "bullets", "layerName", "hidden", "keepFont", "brandSlot", "richPhrases",
+  "isPlaceholder", "origText", "upper", "bullets", "layerName", "hidden", "keepFont", "brandSlot", "brandSrc", "richPhrases",
   "lockMovementX", "lockMovementY", "lockRotation", "lockScalingX", "lockScalingY", "selectable", "evented",
 ];
 
