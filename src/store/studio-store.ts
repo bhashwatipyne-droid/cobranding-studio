@@ -6,13 +6,13 @@ import { sizeById } from "@/lib/fabric-setup";
 import type { BuildInput } from "@/lib/layouts";
 import * as db from "@/lib/persistence";
 import { BUILTIN_TEMPLATES, DEFAULT_KITS } from "@/lib/templates";
-import type { BrandKit, CommentPin, ContentType, DesignDoc, LayoutId, TemplateDef } from "@/lib/types";
+import { isArtLayout, type BrandKit, type CommentPin, type ContentType, type DesignDoc, type LayoutId, type TemplateDef } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
 export type Screen = "gallery" | "type" | "editor";
 export type PanelId = "brand" | "design" | "elements" | "text" | "uploads" | "layers" | "overlay" | "comments" | "history" | null;
 
-interface Filters { type: string; topic: string; brand: string; date: string }
+interface Filters { type: string; topic: string; style: string; brand: string; date: string }
 
 interface StudioState {
   ready: boolean;
@@ -112,7 +112,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   ready: false, screen: "gallery", persist: "unknown",
   kits: structuredClone(DEFAULT_KITS), activeKitKey: "mine",
   templates: BUILTIN_TEMPLATES, recents: [], modalIndex: null, setupOpen: false,
-  query: "", filters: { type: "All types", topic: "All categories", brand: "All brand kits", date: "Anytime" },
+  query: "", filters: { type: "All types", topic: "All categories", style: "All styles", brand: "All brand kits", date: "Anytime" },
   listView: false, toastMsg: null, pendingTemplate: null,
 
   doc: null, pageIdx: 0, controller: null, building: false, sel: null, layersVersion: 0,
@@ -149,7 +149,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       : Array.from({ length: ids }, () => ({ id: uid("pg"), json: null }));
     const doc: DesignDoc = {
       id: uid("local"), title: tpl.name, templateId: tpl.id, contentType: custom?.contentType ?? type,
-      sizeId: custom?.sizeId ?? "post", kitKey: activeKitKey, pages, overlay: { header: false, footer: false },
+      sizeId: custom?.sizeId ?? tpl.sizeId ?? "post", kitKey: activeKitKey, pages, overlay: { header: false, footer: false },
       status: "draft", palette: tpl.palette, layout: tpl.layout,
     };
     set({ doc, pageIdx: 0, screen: "editor", panel: "brand", userZoom: 1, comments: [], thumbs: {}, uploads: [], sel: null, compliance: null, overlayView: false, commentMode: false, saveState: "saved" });
@@ -272,11 +272,15 @@ export const useStudio = create<StudioState>((set, get) => ({
   },
 
   async applyLayoutFrom(tpl) {
+    if (!get().doc || !get().controller) return;
+    // designed templates are drawn for one canvas size — follow it so the artwork isn't stretched or letterboxed
+    const want = isArtLayout(tpl.layout) ? tpl.sizeId ?? "post" : null;
+    if (want && want !== get().doc!.sizeId) get().changeSize(want);
     const { doc, controller } = get();
     if (!doc || !controller) return;
     const input = get().buildInput(tpl.layout, tpl.palette, { headline: "", sub: "" });
     await controller.switchLayout(tpl.layout, tpl.palette, { kit: input.kit, applyKit: input.applyKit, w: input.w, h: input.h });
-    set({ doc: { ...doc, layout: tpl.layout, palette: tpl.palette } });
+    set({ doc: { ...get().doc!, layout: tpl.layout, palette: tpl.palette } });
     get().toast(`Layout: ${tpl.name} — your text, image and logo carried over`);
   },
 
@@ -285,7 +289,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!doc || !controller) return;
     const kit = get().kits[doc.kitKey];
     if (!kit.setupComplete) { get().toast("Set up cobranding first — opening setup"); set({ setupOpen: true }); return; }
-    await controller.reapplyKit(kit, doc.palette ?? BUILTIN_TEMPLATES[0].palette);
+    await controller.reapplyKit(kit, doc.palette ?? BUILTIN_TEMPLATES[0].palette, doc.layout);
     get().toast(`Applied ${kit.label} branding to this post`);
   },
   async applyKitAll() {
@@ -293,7 +297,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!doc || !controller) return;
     const kit = get().kits[doc.kitKey];
     controller.brandColor = kit.color;
-    await controller.applyKitToAll(kit, doc.palette ?? BUILTIN_TEMPLATES[0].palette);
+    await controller.applyKitToAll(kit, doc.palette ?? BUILTIN_TEMPLATES[0].palette, doc.layout);
     get().toast("Brand kit applied to all elements");
   },
 

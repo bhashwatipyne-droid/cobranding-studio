@@ -64,7 +64,10 @@ export interface DesignDoc {
   updatedAt?: string;
 }
 
-export type LayoutId = "hero" | "split" | "card" | "stat" | "quote" | "minimal" | "banner" | "badge";
+export type LayoutId =
+  | "hero" | "split" | "card" | "stat" | "quote" | "minimal" | "banner" | "badge"
+  /** designed, fully-editable templates (see template-art.ts) */
+  | "art-quiz" | "art-bonds" | "art-habits" | "art-dussehra";
 
 export interface TemplateDef {
   id: string;
@@ -79,6 +82,10 @@ export interface TemplateDef {
   headline: string;
   sub: string;
   stat?: string;
+  /** canvas size the template is designed for (defaults to the 1080×1080 post) */
+  sizeId?: string;
+  /** visual style tag shown in the gallery, e.g. "Minimalist" */
+  style?: string;
   custom?: boolean;
   thumbnail?: string | null;
   doc?: DesignDoc | null;
@@ -91,3 +98,6 @@ export interface CommentPin {
   y: number;
   text: string;
 }
+
+/** Designed templates (template-art.ts) — each is drawn for one canvas size. */
+export const isArtLayout = (l: string) => l.startsWith("art-");

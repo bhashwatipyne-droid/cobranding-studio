@@ -50,7 +50,7 @@ export async function renderPage(
     r.objects?.forEach(walk);
   };
   walk(json);
-  await Promise.all([...fam].map(ensureFont));
+  await Promise.all([...fam].map((f) => ensureFont(f)));
 
   const el = document.createElement("canvas");
   const sc = new StaticCanvas(el, { width: w, height: h, enableRetinaScaling: false });

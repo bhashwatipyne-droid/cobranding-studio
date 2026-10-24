@@ -6,10 +6,11 @@
 import {
   Circle, FabricImage, FabricObject, Gradient, Group, Rect, Textbox, loadSVGFromString, util,
 } from "fabric";
-import type { BrandKit, LayoutId, LogoPos, TemplateDef } from "./types";
+import { isArtLayout, type BrandKit, type LayoutId, type LogoPos, type TemplateDef } from "./types";
 import { combineDetails } from "./templates";
 import { ensureFont } from "./fabric-setup";
 import { initials, uid } from "./utils";
+import { buildArt } from "./template-art";
 
 export interface PageContent {
   headline: string;
@@ -41,7 +42,7 @@ export type Grad = Gradient<"linear">;
 const INK = "#0D1B3E";
 const INK_SOFT = "#546490";
 
-export const LAYOUT_ROLES = new Set(["headline", "sub", "stat", "image", "accent", "strip", "logo", "details", "decor"]);
+export const LAYOUT_ROLES = new Set(["headline", "sub", "stat", "image", "accent", "strip", "logo", "details", "decor", "art"]);
 
 function gradient(p: [string, string], w: number, h: number, horizontal = false) {
   return new Gradient({
@@ -52,16 +53,16 @@ function gradient(p: [string, string], w: number, h: number, horizontal = false)
   });
 }
 
-function tag<T extends FabricObject>(o: T, role: string, kind: string, extra: Partial<FabricObject> = {}): T {
+export function tag<T extends FabricObject>(o: T, role: string, kind: string, extra: Partial<FabricObject> = {}): T {
   o.set({ id: uid("el"), role, kind, ...extra });
   return o;
 }
 
-interface TextOpts {
+export interface TextOpts {
   left: number; top: number; width: number; size: number; weight?: number | string; color: string;
   font: string; align?: "left" | "center" | "right"; lineHeight?: number; italic?: boolean; opacity?: number; templateText?: boolean;
 }
-function text(role: string, value: string, o: TextOpts) {
+export function text(role: string, value: string, o: TextOpts) {
   const t = new Textbox(value, {
     left: o.left, top: o.top, width: o.width, fontSize: o.size, fontWeight: o.weight ?? 400,
     fill: o.color, fontFamily: o.font, textAlign: o.align ?? "left", lineHeight: o.lineHeight ?? 1.15,
@@ -73,7 +74,7 @@ function text(role: string, value: string, o: TextOpts) {
   return t;
 }
 
-function rect(role: string, o: { left: number; top: number; width: number; height: number; fill: string | Grad; rx?: number; opacity?: number; kind?: string }) {
+export function rect(role: string, o: { left: number; top: number; width: number; height: number; fill: string | Grad; rx?: number; opacity?: number; kind?: string }) {
   const r = new Rect({ left: o.left, top: o.top, width: o.width, height: o.height, fill: o.fill, rx: o.rx ?? 0, ry: o.rx ?? 0, opacity: o.opacity ?? 1 });
   return tag(r, role, o.kind ?? "shape");
 }
@@ -187,7 +188,9 @@ export function stripHeight(w: number, h: number) {
 /** Default header/footer: template colours, kit logo + company details, applied without any manual step. */
 export async function buildBrand(inp: BuildInput, kit = inp.kit): Promise<FabricObject[]> {
   const { w, h, palette, applyKit } = inp;
-  const m = Math.round(w * 0.045);
+  // designed templates keep their artwork edge to edge, so their logo is a little smaller and tucked closer to the corner
+  const compact = isArtLayout(inp.layout);
+  const m = compact ? 28 : Math.round(w * 0.045);
   const sh = stripHeight(w, h);
   const top = (applyKit ? kit.detailsPosition : "bottom") === "top";
   const stripTop = top ? 0 : h - sh;
@@ -196,7 +199,7 @@ export async function buildBrand(inp: BuildInput, kit = inp.kit): Promise<Fabric
   const strip = rect("strip", { left: 0, top: stripTop, width: w, height: sh, fill: gradient(palette, w, sh, true) });
   strip.set({ layerName: top ? "Header strip" : "Footer strip" });
 
-  const lb = logoBox(w, h);
+  const lb = compact ? { w: Math.round(w * 0.17), h: Math.round(Math.min(w, h) * 0.075) } : logoBox(w, h);
   const logo = await makeLogo(kit, applyKit, lb.w, lb.h);
   const pos = applyKit ? kit.position : "top-left";
   const xy = logoXY(pos, w, h, lb.w, lb.h, m);
@@ -224,6 +227,10 @@ export async function buildBrand(inp: BuildInput, kit = inp.kit): Promise<Fabric
 // ───────────────────────────── layouts ─────────────────────────────
 
 export async function buildPage(inp: BuildInput): Promise<BuiltPage> {
+  if (isArtLayout(inp.layout)) {
+    const art = await buildArt(inp);
+    return { objects: [...art.objects, ...(await buildBrand(inp))], background: art.background };
+  }
   const { w, h, palette, content, applyKit, kit, layout } = inp;
   const headFont = applyKit ? kit.fontHeading : "Sora";
   const bodyFont = applyKit ? kit.fontBody : "Inter";
