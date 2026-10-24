@@ -25,6 +25,8 @@ export interface BrandKit {
   /** Fonts that aren't on Google Fonts (picked up from the brand's website) — registered from their file URL */
   customFonts?: { family: string; url: string }[];
   autoApply: boolean;
+  /** White box behind the logo (default on). Off = the logo sits directly on the strip. */
+  logoPlate?: boolean;
   setupComplete: boolean;
   companyName: string;
   rrn: string;

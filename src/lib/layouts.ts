@@ -134,7 +134,7 @@ export async function makeLogo(kit: BrandKit, useKit: boolean, boxW: number, box
   const pad = Math.round(Math.min(boxW, boxH) * 0.14);
   const plateFill = useKit && kit.logoSvg ? "#FFFFFF" : useKit ? kit.color : "#2B2BB5";
   const plate = new Rect({ width: boxW, height: boxH, rx: Math.round(boxH * 0.16), ry: Math.round(boxH * 0.16), fill: plateFill, originX: "left", originY: "top" });
-  plate.set({ role: "plate", id: uid("el") });
+  plate.set({ role: "plate", id: uid("el"), opacity: useKit && kit.logoPlate === false ? 0 : 1 });
   const parts: FabricObject[] = [plate];
 
   if (useKit && kit.logoSvg) {

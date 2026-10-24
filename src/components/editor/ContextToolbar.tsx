@@ -107,6 +107,14 @@ export function ContextToolbar() {
           <Sep />
         </>
       )}
+      {sel.kind === "logo" && sel.logoPlate !== undefined && (
+        <>
+          <button onClick={() => c.setLogoPlate(!sel.logoPlate)} className="h-8 rounded-md border border-line-2 px-3 text-xs font-semibold hover:border-accent" aria-pressed={sel.logoPlate}>
+            {sel.logoPlate ? "Remove box behind logo" : "Add box behind logo"}
+          </button>
+          <Sep />
+        </>
+      )}
       {sel.kind === "image" && sel.image && (
         <>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={async (e) => {

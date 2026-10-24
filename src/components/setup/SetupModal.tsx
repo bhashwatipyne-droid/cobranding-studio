@@ -216,6 +216,10 @@ export function SetupModal() {
               </div>
             </section>
 
+            <section className="mb-3 flex items-center justify-between rounded-lg border border-line-2 bg-surface-2 px-4 py-3">
+              <div><div className="text-[13px] font-bold">Box behind logo</div><div className="text-xs text-ink-soft">Off = logo sits directly on the strip. Keep it on if your logo is dark and the strip is dark.</div></div>
+              <Switch checked={draft.logoPlate !== false} onCheckedChange={(v) => set("logoPlate", v)} aria-label="Box behind logo" />
+            </section>
             <section className="flex items-center justify-between rounded-lg border border-line-2 bg-surface-2 px-4 py-3">
               <div><div className="text-[13px] font-bold">Auto-apply to new designs</div><div className="text-xs text-ink-soft">Off = templates open unbranded so you can brand by hand.</div></div>
               <Switch checked={draft.autoApply} onCheckedChange={(v) => set("autoApply", v)} aria-label="Auto-apply" />
@@ -236,7 +240,7 @@ export function SetupModal() {
             </div>
             <div style={{ aspectRatio: `${sizeById(pvSize).w} / ${sizeById(pvSize).h}`, fontFamily: draft.fontHeading }} className="relative grid max-h-[420px] place-items-center p-6 text-center text-[17px] font-extrabold leading-tight text-white">
               Your headline goes here
-              <div className={cn("absolute rounded-md bg-white p-1.5 shadow-2", draft.position.startsWith("top") ? "top-3" : draft.position.startsWith("bottom") ? "bottom-3" : "top-1/2 -translate-y-1/2", draft.position.endsWith("left") ? "left-3" : draft.position.endsWith("right") ? "right-3" : draft.position === "center" ? "left-1/2 -translate-x-1/2" : "left-1/2 -translate-x-1/2")}>
+              <div className={cn("absolute rounded-md p-1.5", draft.logoPlate !== false && "bg-white shadow-2", draft.position.startsWith("top") ? "top-3" : draft.position.startsWith("bottom") ? "bottom-3" : "top-1/2 -translate-y-1/2", draft.position.endsWith("left") ? "left-3" : draft.position.endsWith("right") ? "right-3" : draft.position === "center" ? "left-1/2 -translate-x-1/2" : "left-1/2 -translate-x-1/2")}>
                 {logoPreview ? <img src={logoPreview} alt="" className="h-6 max-w-16 object-contain" /> : <span className="text-[9px] font-bold" style={{ color: draft.color }}>{draft.logoName}</span>}
               </div>
             </div>

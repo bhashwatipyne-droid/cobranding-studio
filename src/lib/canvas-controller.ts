@@ -28,6 +28,7 @@ export interface SelInfo {
   paint?: { fill: string; stroke: string; strokeWidth: number };
   image?: { brightness: number; contrast: number; saturation: number; whiteRemoved: boolean; hue: number; isBackgroundArt: boolean };
   bg?: { from: string; to: string | null; hasImage: boolean };
+  logoPlate?: boolean;
 }
 
 export interface LayerInfo { id: string; name: string; kind: string; visible: boolean; locked: boolean; selected: boolean }
@@ -408,6 +409,9 @@ export class CanvasController {
       if (first.templateText) this.pushCompliance(first, !!first.isEditing);
     } else {
       this.hooks.onCompliance(null);
+    }
+    if (!multi && first.kind === "logo" && first instanceof Group) {
+      info.logoPlate = (first.getObjects().find((o) => o.role === "plate")?.opacity ?? 1) > 0;
     }
     if (!multi && !isText(first)) {
       const bt = this.borderTargets()[0] ?? first;
@@ -911,6 +915,16 @@ export class CanvasController {
   setColor(color: string) {
     this.targets().forEach((t) => (isText(t) ? t.set("fill", color) : paint(t, color)));
     this.done("Changed colour");
+  }
+  /** Show/hide the box behind the logo. */
+  setLogoPlate(on: boolean) {
+    this.targets().forEach((t) => {
+      if (t.kind === "logo" && t instanceof Group) t.getObjects().filter((o) => o.role === "plate").forEach((p) => p.set("opacity", on ? 1 : 0));
+      t.dirty = true;
+    });
+    this.canvas.requestRenderAll();
+    this.done(on ? "Logo box on" : "Logo box off");
+    this.emitSelection();
   }
   /** Groups don't draw their own stroke: the logo's border lives on its plate, other groups on their shapes. */
   private borderTargets(): FabricObject[] {
