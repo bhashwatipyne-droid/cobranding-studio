@@ -345,10 +345,11 @@ export class CanvasController {
       this.hooks.onCompliance(null);
     }
     if (!multi && !isText(first)) {
+      const bt = this.borderTargets()[0] ?? first;
       info.paint = {
-        fill: typeof first.fill === "string" && first.fill ? first.fill : this.brandColor,
-        stroke: typeof first.stroke === "string" && first.stroke ? first.stroke : "#000000",
-        strokeWidth: first.strokeWidth ?? 0,
+        fill: typeof bt.fill === "string" && bt.fill ? bt.fill : this.brandColor,
+        stroke: typeof bt.stroke === "string" && bt.stroke ? bt.stroke : "#000000",
+        strokeWidth: bt.strokeWidth ?? 0,
       };
     }
     if (!multi && isImage(first)) {
@@ -660,14 +661,35 @@ export class CanvasController {
     this.targets().forEach((t) => (isText(t) ? t.set("fill", color) : paint(t, color)));
     this.done("Changed colour");
   }
+  /** Groups don't draw their own stroke: the logo's border lives on its plate, other groups on their shapes. */
+  private borderTargets(): FabricObject[] {
+    const out: FabricObject[] = [];
+    const walk = (o: FabricObject) => {
+      if (o instanceof Group && !(o instanceof ActiveSelection)) {
+        if (o.kind === "logo") { const plate = o.getObjects().find((c) => c.role === "plate"); if (plate) out.push(plate); }
+        else o.getObjects().forEach(walk);
+      } else if (!isText(o)) out.push(o);
+    };
+    this.targets().forEach(walk);
+    return out;
+  }
   stepBorder(d: number) {
-    this.targets().forEach((t) => {
+    this.borderTargets().forEach((t) => {
       const w = Math.max(0, (t.strokeWidth ?? 0) + d);
-      t.set({ strokeWidth: w, stroke: typeof t.stroke === "string" && t.stroke ? t.stroke : "#000000" });
+      t.set({ strokeWidth: w, strokeUniform: true, stroke: typeof t.stroke === "string" && t.stroke ? t.stroke : this.brandColor });
+      t.dirty = true;
     });
     this.done("Changed border");
+    this.emitSelection();
   }
-  setBorderColor(c: string) { this.targets().forEach((t) => t.set("stroke", c)); this.done("Changed border colour"); }
+  setBorderColor(c: string) {
+    this.borderTargets().forEach((t) => {
+      t.set({ stroke: c, strokeUniform: true, strokeWidth: (t.strokeWidth ?? 0) > 0 ? t.strokeWidth : 2 });
+      t.dirty = true;
+    });
+    this.done("Changed border colour");
+    this.emitSelection();
+  }
 
   // ───────────────────────── arrange ─────────────────────────
   reorder(dir: "front" | "back") {
