@@ -404,13 +404,16 @@ export class CanvasController {
       opacity: first.opacity ?? 1,
       isGroup: !multi && first instanceof Group && first.kind !== "logo",
     };
-    if (!multi && isText(first)) {
+    const textFirst = ts.find(isText);
+    if (textFirst) {
       info.text = {
-        fontFamily: first.fontFamily ?? "Inter", fontSize: Math.round((first.fontSize ?? 16) * (first.scaleY ?? 1)),
-        bold: Number(first.fontWeight) >= 700, italic: first.fontStyle === "italic", underline: !!first.underline,
-        strike: !!first.linethrough, align: first.textAlign ?? "left", fill: typeof first.fill === "string" ? first.fill : "#0D1B3E",
-        lineHeight: first.lineHeight ?? 1.15, upper: !!first.upper, bullets: !!first.bullets, shadow: !!first.shadow,
+        fontFamily: textFirst.fontFamily ?? "Inter", fontSize: Math.round((textFirst.fontSize ?? 16) * (textFirst.scaleY ?? 1)),
+        bold: Number(textFirst.fontWeight) >= 700, italic: textFirst.fontStyle === "italic", underline: !!textFirst.underline,
+        strike: !!textFirst.linethrough, align: textFirst.textAlign ?? "left", fill: typeof textFirst.fill === "string" ? textFirst.fill : "#0D1B3E",
+        lineHeight: textFirst.lineHeight ?? 1.15, upper: !!textFirst.upper, bullets: !!textFirst.bullets, shadow: !!textFirst.shadow,
       };
+    }
+    if (!multi && isText(first)) {
       if (first.templateText) this.pushCompliance(first, !!first.isEditing);
     } else {
       this.hooks.onCompliance(null);
@@ -418,8 +421,8 @@ export class CanvasController {
     if (!multi && first.kind === "logo" && first instanceof Group) {
       info.logoPlate = (first.getObjects().find((o) => o.role === "plate")?.opacity ?? 1) > 0;
     }
-    if (!multi && !isText(first)) {
-      const bt = this.borderTargets()[0] ?? first;
+    if (ts.some((t) => !isText(t))) {
+      const bt = this.borderTargets()[0] ?? ts.find((t) => !isText(t))!;
       info.paint = {
         fill: typeof bt.fill === "string" && bt.fill ? bt.fill : this.brandColor,
         stroke: typeof bt.stroke === "string" && bt.stroke ? bt.stroke : "#000000",
@@ -952,6 +955,10 @@ export class CanvasController {
   setOpacity(v: number) { this.targets().forEach((t) => t.set("opacity", v)); this.canvas.requestRenderAll(); }
   commitSoft(label: string) { this.commit(label); }
 
+  /** Colour for text only (so a mixed selection keeps shapes and text apart). */
+  setTextColor(color: string) { this.texts().forEach((t) => t.set("fill", color)); this.done("Changed text colour"); }
+  /** Fill colour for shapes/icons/lines only. */
+  setShapeColor(color: string) { this.targets().forEach((t) => { if (!isText(t)) paint(t, color); }); this.done("Changed colour"); }
   setColor(color: string) {
     this.targets().forEach((t) => (isText(t) ? t.set("fill", color) : paint(t, color)));
     this.done("Changed colour");

@@ -92,14 +92,14 @@ export function ContextToolbar() {
           <Btn label="Align right" active={t.align === "right"} onClick={() => c.setAlign("right")}><AlignRight /></Btn>
           <Btn label="Bullets" active={t.bullets} onClick={() => c.toggleBullets()}><List /></Btn>
           <Btn label="Shadow" active={t.shadow} onClick={() => c.toggleShadow()}><Droplets /></Btn>
-          <Color label="Text colour" value={t.fill} onChange={(v) => c.setColor(v)} />
+          <Color label="Text colour" value={t.fill} onChange={(v) => c.setTextColor(v)} />
           <Slider label="Line height" value={t.lineHeight} min={0.8} max={2} step={0.05} onChange={(v) => c.setLineHeight(v)} onDone={() => done("Line height")} icon={<Type />} />
           <Sep />
         </>
       )}
-      {sel.paint && !isTxt && (
+      {sel.paint && (
         <>
-          {sel.kind !== "image" && <Color label="Fill colour" value={sel.paint.fill || "#2B2BB5"} onChange={(v) => c.setColor(v)} />}
+          {sel.kind !== "image" && <Color label="Fill colour" value={sel.paint.fill || "#2B2BB5"} onChange={(v) => c.setShapeColor(v)} />}
           {sel.kind !== "image" && <Color label="Border colour" value={sel.paint.stroke || "#2B2BB5"} onChange={(v) => c.setBorderColor(v)} />}
           <Btn label="Thinner border" onClick={() => c.stepBorder(-1)}><Minus /></Btn>
           <span className="w-6 text-center text-xs font-semibold tabular-nums">{sel.paint.strokeWidth}</span>
