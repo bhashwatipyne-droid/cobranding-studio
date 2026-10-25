@@ -88,7 +88,7 @@ interface StudioState {
   switchPage(i: number): Promise<void>;
   addPage(): Promise<void>;
   deletePage(i: number): Promise<void>;
-  changeSize(sizeId: string): void;
+  changeSize(sizeId: string, relayout?: boolean): Promise<void>;
   applyLayoutFrom(tpl: TemplateDef): Promise<void>;
   reapplySetup(): Promise<void>;
   applyKitAll(): Promise<void>;
@@ -261,21 +261,35 @@ export const useStudio = create<StudioState>((set, get) => ({
     get().onChange();
   },
 
-  changeSize(sizeId) {
+  async changeSize(sizeId, relayout = true) {
     const { doc, controller } = get();
     if (!doc || !controller) return;
     const s = sizeById(sizeId);
+    const ow = controller.W, oh = controller.H;
     set({ doc: { ...doc, sizeId } });
     controller.setLogicalSize(s.w, s.h);
+    if (relayout && (ow !== s.w || oh !== s.h)) {
+      const palette = doc.palette ?? BUILTIN_TEMPLATES[0].palette;
+      const layout = doc.layout ?? "hero";
+      const input = get().buildInput(layout, palette, { headline: "", sub: "" });
+      if (isArtLayout(layout)) {
+        // designed artwork: scale to fit + centre, then rebuild the brand strip/logo at the new edges
+        controller.refitArt(ow, oh);
+        await controller.swapBrand(input.kit, input.applyKit, palette, layout);
+      } else {
+        // built-in layouts are generated for any size: rebuild at the new size, carrying text/image/logo over
+        await controller.switchLayout(layout, palette, { kit: input.kit, applyKit: input.applyKit, w: input.w, h: input.h });
+      }
+    }
     controller.commitSoft("Resized canvas");
-    get().toast("Canvas resized — reposition elements as needed");
+    get().toast(`Resized to ${s.label.split(" · ")[0]} — elements re-fitted`);
   },
 
   async applyLayoutFrom(tpl) {
     if (!get().doc || !get().controller) return;
     // designed templates are drawn for one canvas size — follow it so the artwork isn't stretched or letterboxed
     const want = isArtLayout(tpl.layout) ? tpl.sizeId ?? "post" : null;
-    if (want && want !== get().doc!.sizeId) get().changeSize(want);
+    if (want && want !== get().doc!.sizeId) await get().changeSize(want, false);
     const { doc, controller } = get();
     if (!doc || !controller) return;
     const input = get().buildInput(tpl.layout, tpl.palette, { headline: "", sub: "" });

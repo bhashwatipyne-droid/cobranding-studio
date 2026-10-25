@@ -243,6 +243,48 @@ export class CanvasController {
     this.W = w; this.H = h;
     this.applyScale();
   }
+  /**
+   * Canvas size changed: scale the designed artwork uniformly to fit the new size and centre it (nothing stretched or cropped);
+   * full-bleed photos re-cover the page. The brand strip/logo are rebuilt separately at the new edges.
+   */
+  refitArt(ow: number, oh: number) {
+    const nw = this.W, nh = this.H;
+    const brand = new Set(["strip", "details", "logo", "plate"]);
+    const decor = (o: FabricObject) => /^Dot\b/i.test(o.layerName ?? "");
+    // the artwork's real extent (ignoring brand parts, full-bleed photos and loose decoration)
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    this.canvas.getObjects().forEach((o) => {
+      if ((o.role && brand.has(o.role)) || isBgArt(o, ow, oh) || decor(o)) return;
+      o.getCoords().forEach((p) => { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+    });
+    if (!isFinite(x0)) { x0 = 0; y0 = 0; x1 = ow; y1 = oh; }
+    const bw = Math.max(1, x1 - x0), bh = Math.max(1, y1 - y0);
+    // usable area: side margins, plus room at top/bottom for the logo and the details strip
+    const ax0 = nw * 0.07, ax1 = nw * 0.93, ay0 = nh * 0.15, ay1 = nh * 0.83;
+    const k = Math.min((ax1 - ax0) / bw, (ay1 - ay0) / bh, 1.5);
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, tx = (ax0 + ax1) / 2, ty = (ay0 + ay1) / 2;
+    const mapX = (x: number) => tx + (x - cx) * k, mapY = (y: number) => ty + (y - cy) * k;
+    this.canvas.getObjects().forEach((o) => {
+      if (o.role && brand.has(o.role)) return;
+      if (isBgArt(o, ow, oh)) {
+        const iw = o.width || nw, ih = o.height || nh;
+        const kk = Math.max(nw / iw, nh / ih);
+        o.set({ scaleX: kk, scaleY: kk, left: (nw - iw * kk) / 2, top: nh - ih * kk });
+      } else if (isText(o)) {
+        o.set({ fontSize: (o.fontSize ?? 16) * k, width: (o.width ?? 100) * k, left: mapX(o.left ?? 0), top: mapY(o.top ?? 0) });
+        o.initDimensions();
+      } else {
+        o.set({ scaleX: (o.scaleX ?? 1) * k, scaleY: (o.scaleY ?? 1) * k, left: mapX(o.left ?? 0), top: mapY(o.top ?? 0) });
+      }
+      o.setCoords();
+    });
+    const bg = this.canvas.backgroundColor;
+    if (bg instanceof Gradient && bg.coords) {
+      const cd = bg.coords as unknown as Record<string, number>;
+      if (bg.gradientUnits === "pixels") { for (const key of ["x1", "x2"]) if (cd[key] !== undefined) cd[key] *= nw / ow; for (const key of ["y1", "y2"]) if (cd[key] !== undefined) cd[key] *= nh / oh; }
+    }
+    this.canvas.requestRenderAll();
+  }
   setDisplayScale(s: number) {
     this.scale = Math.max(0.05, s);
     this.applyScale();
@@ -580,12 +622,10 @@ export class CanvasController {
 
   private roleObj(role: string) { return this.canvas.getObjects().find((o) => o.role === role); }
 
-  /** Re-apply logo / details / fonts without regenerating the layout (FR-17). */
-  async reapplyKit(kit: BrandKit, palette: [string, string], layout: LayoutId = "hero") {
-    registerKitFonts(kit);
-    await Promise.all([ensureFont(kit.fontHeading), ensureFont(kit.fontBody)]);
+  /** Rebuild strip + company details + logo for the current canvas size (keeps the strip's colour). */
+  async swapBrand(kit: BrandKit, applyKit: boolean, palette: [string, string], layout: LayoutId) {
     const objs = this.canvas.getObjects();
-    const fresh = await buildBrand({ kit, applyKit: true, layout, palette, content: { headline: "", sub: "" }, w: this.W, h: this.H });
+    const fresh = await buildBrand({ kit, applyKit, layout, palette, content: { headline: "", sub: "" }, w: this.W, h: this.H });
     const oldStrip = this.roleObj("strip");
     const stripFill = oldStrip?.fill;
     (["strip", "details", "logo"] as const).forEach((role, i) => {
@@ -597,6 +637,13 @@ export class CanvasController {
       if (idx >= 0) this.canvas.insertAt(idx, n); else this.canvas.add(n);
       void i;
     });
+  }
+
+  /** Re-apply logo / details / fonts without regenerating the layout (FR-17). */
+  async reapplyKit(kit: BrandKit, palette: [string, string], layout: LayoutId = "hero") {
+    registerKitFonts(kit);
+    await Promise.all([ensureFont(kit.fontHeading), ensureFont(kit.fontBody)]);
+    await this.swapBrand(kit, true, palette, layout);
     this.canvas.getObjects().forEach((o) => {
       // Every text follows the brand: the template's display fonts become the heading font, its text fonts the body font.
       if (!isText(o) || o.role === "details" || o.role === "strip" || o.role === "logo" || o.role === "logoText") return;
