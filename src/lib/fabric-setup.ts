@@ -97,7 +97,10 @@ export const sizeById = (id: string) => SIZES.find((s) => s.id === id) ?? SIZES[
 // ── fonts ──
 const loadedFonts = new Set(["Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia", "Bree Serif"]);
 /** Google families that only ship a regular weight — asking for wght@… makes the whole request fail. */
-const SINGLE_WEIGHT = new Set(["Bree Serif", "Bebas Neue", "Abril Fatface", "Lobster", "Pacifico", "Satisfy", "Anton", "Righteous", "Great Vibes"]);
+/** Families that actually contain Devanagari (Hindi/Marathi) letters. */
+export const DEVANAGARI_FONTS = new Set(["Poppins", "Noto Sans Devanagari", "Noto Serif Devanagari", "Hind", "Mukta", "Baloo 2", "Tiro Devanagari Hindi"]);
+export const hasDevanagari = (s: string) => /[\u0900-\u097F]/.test(s);
+const SINGLE_WEIGHT = new Set(["Tiro Devanagari Hindi", "Bree Serif", "Bebas Neue", "Abril Fatface", "Lobster", "Pacifico", "Satisfy", "Anton", "Righteous", "Great Vibes"]);
 export const FONT_CHOICES = [
   "Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia",
   "Montserrat", "Open Sans", "Nunito", "Raleway", "Oswald", "Work Sans", "Rubik", "Karla",
@@ -105,6 +108,7 @@ export const FONT_CHOICES = [
   "Josefin Sans", "Cabin", "Barlow", "Mulish", "Heebo", "Libre Baskerville", "Crimson Text",
   "Bitter", "Domine", "Zilla Slab", "Archivo", "Epilogue", "Outfit", "Plus Jakarta Sans",
   "Figtree", "Urbanist", "Bebas Neue", "Abril Fatface", "Bree Serif",
+  "Noto Sans Devanagari", "Hind", "Mukta", "Baloo 2", "Noto Serif Devanagari", "Tiro Devanagari Hindi",
   "Lobster", "Pacifico", "Dancing Script", "Caveat", "Satisfy", "Comfortaa", "Anton", "Righteous", "Great Vibes", "Cinzel", "Lora", "Noto Sans", "Nunito Sans", "IBM Plex Sans", "Source Sans 3", "Cormorant Garamond",
 ];
 
@@ -139,7 +143,8 @@ export async function ensureFont(family: string, weights: number[] = [300, 400, 
     document.head.appendChild(link);
   }
   try {
-    await Promise.all(weights.map((w) => document.fonts.load(`${w} 24px "${family}"`)));
+    const sample = DEVANAGARI_FONTS.has(family) ? "Aa अआकखग" : undefined; // pulls in the Latin and Devanagari subsets
+    await Promise.all(weights.map((w) => document.fonts.load(`${w} 24px "${family}"`, sample)));
   } catch {
     /* offline / blocked — canvas falls back to the system font */
   }

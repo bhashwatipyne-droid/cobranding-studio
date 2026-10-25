@@ -4,10 +4,10 @@
  * and receive derived state (selection info, layers, history, compliance) through the hooks.
  */
 import {
-  ActiveSelection, Canvas, Circle, FabricImage, FabricObject, Gradient, Group, Path, Point, Rect, Shadow, Textbox, Triangle, filters, util,
+  ActiveSelection, Canvas, Circle, FabricImage, FabricObject, Gradient, Group, IText, Path, Point, Rect, Shadow, Textbox, Triangle, filters, util,
 } from "fabric";
 import { complianceSynonyms, computeFlagSpans, replaceTerm } from "./compliance";
-import { configureFabric, ensureFont, registerKitFonts, CUSTOM_PROPS } from "./fabric-setup";
+import { configureFabric, ensureFont, registerKitFonts, CUSTOM_PROPS, DEVANAGARI_FONTS, hasDevanagari } from "./fabric-setup";
 import { LAYOUT_ROLES, buildBrand, buildPage, fitImage, setImageSource, type BuildInput, type Grad, type PageContent } from "./layouts";
 import type { BrandKit, LayoutId } from "./types";
 import { buildRemap, fromHsl, parseCss, toHsl, type ColorUse } from "./recolor";
@@ -963,6 +963,73 @@ export class CanvasController {
     this.targets().forEach((t) => (isText(t) ? t.set("fill", color) : paint(t, color)));
     this.done("Changed colour");
   }
+  /** If a text now holds Devanagari letters but its font has none, switch it to one that does (otherwise the browser shows a mismatched fallback). */
+  private async fitScript(t: Textbox): Promise<boolean> {
+    if (!hasDevanagari(t.text ?? "") || DEVANAGARI_FONTS.has(t.fontFamily ?? "")) return false;
+    await ensureFont("Noto Sans Devanagari");
+    t.set("fontFamily", "Noto Sans Devanagari");
+    t.initDimensions();
+    return true;
+  }
+
+  /** On-screen keyboard: put characters into the selected text at the caret (starts editing if needed). */
+  async typeText(ch: string, backspace = false) {
+    const t = this.canvas.getActiveObject();
+    if (!t || !isText(t)) return;
+    const gs = (str: string) => util.string.graphemeSplit(str);
+    const text = t.text ?? "";
+    if (!t.isEditing) { t.enterEditing(); const n = gs(text).length; t.selectionStart = n; t.selectionEnd = n; }
+    // Fabric's caret counts graphemes ("का" is one); work on the string so we can delete/insert single code points.
+    const g = gs(text);
+    const off = (i: number) => g.slice(0, Math.max(0, Math.min(i, g.length))).join("").length;
+    const sa = t.selectionStart ?? g.length, sb = t.selectionEnd ?? sa;
+    let pre = text.slice(0, off(sa));
+    const post = text.slice(off(sb));
+    if (backspace) {
+      if (sa === sb) { if (!pre) return; pre = Array.from(pre).slice(0, -1).join(""); }
+    } else pre += ch;
+    t.set("text", pre + post);
+    const caret = gs(pre).length;
+    t.selectionStart = caret; t.selectionEnd = caret;
+    if (t.hiddenTextarea) { t.hiddenTextarea.value = t.text ?? ""; t.hiddenTextarea.selectionStart = pre.length; t.hiddenTextarea.selectionEnd = pre.length; }
+    const switched = await this.fitScript(t);
+    t.initDimensions();
+    this.canvas.fire("text:changed", { target: t as unknown as IText });
+    this.canvas.requestRenderAll();
+    if (switched) this.hooks.toast("This font has no Hindi letters — switched to Noto Sans Devanagari");
+    this.emitSelection();
+  }
+
+  /** Translate the selected texts (or every message text when nothing is selected). */
+  async translate(target: string): Promise<{ ok: boolean; count: number; error?: string }> {
+    const sel = this.texts();
+    const pool = sel.length ? sel : this.canvas.getObjects().filter((o): o is Textbox => isText(o) && !["details", "strip", "logo", "logoText", "plate"].includes(o.role ?? "") && !!(o.text ?? "").trim());
+    if (!pool.length) return { ok: false, count: 0, error: "No text to translate" };
+    try {
+      const res = await fetch("/api/translate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ texts: pool.map((t) => t.text ?? ""), target }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Translation failed");
+      const out = j.texts as string[];
+      if (target === "hi") await ensureFont("Noto Sans Devanagari");
+      for (let i = 0; i < pool.length; i++) {
+        const t = pool[i];
+        t.set("text", out[i] ?? t.text);
+        t.origText = t.text;
+        t.richPhrases = []; // emphasis phrases were matched on the English words
+        if (target === "hi") await this.fitScript(t);
+        t.initDimensions();
+        this.clampToCanvas(t);
+        t.dirty = true;
+      }
+      this.canvas.requestRenderAll();
+      this.done(`Translated to ${target === "hi" ? "Hindi" : target.toUpperCase()}`);
+      this.emitSelection();
+      return { ok: true, count: pool.length };
+    } catch (e) {
+      return { ok: false, count: 0, error: e instanceof Error ? e.message : "Translation failed" };
+    }
+  }
+
   /** Show/hide the box behind the logo. */
   setLogoPlate(on: boolean) {
     this.targets().forEach((t) => {

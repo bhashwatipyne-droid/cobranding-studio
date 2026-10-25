@@ -1,9 +1,10 @@
 "use client";
 import {
   AlignCenter, AlignLeft, AlignRight, Bold, Copy, Eraser, Group, Italic, List, Lock, Minus, MoveDown, MoveUp,
-  Plus, Strikethrough, Sun, Trash2, Type, Underline, Ungroup, Unlock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ImagePlus, CaseUpper, Droplets,
+  Plus, Strikethrough, Sun, Trash2, Type, Underline, Ungroup, Unlock, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ImagePlus, CaseUpper, Droplets, Languages, Loader2,
 } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { HindiKeyboard } from "./HindiKeyboard";
 import { Tip } from "@/components/ui/tooltip";
 import { FONT_CHOICES } from "@/lib/fabric-setup";
 import { fileToDataUrl, shrinkPhoto } from "@/lib/vectorize";
@@ -41,10 +42,37 @@ function Slider({ label, value, min, max, step = 1, onChange, onDone, icon }: { 
   );
 }
 
+/** Translate the selection (or every message text when nothing is selected). */
+function TranslateMenu({ label }: { label: string }) {
+  const { controller: c } = useStudio();
+  const toast = useStudio((s) => s.toast);
+  const [busy, setBusy] = useState(false);
+  if (!c) return null;
+  return (
+    <Tip label="Translate (machine translation — review before publishing)">
+      <label className="relative flex h-8 shrink-0 items-center gap-1 rounded-md border border-line-2 px-2 text-xs font-semibold text-ink-soft hover:border-accent">
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Languages className="size-4" />}
+        <select aria-label={label} value="" disabled={busy} onChange={async (e) => {
+          const lang = e.target.value; if (!lang) return;
+          setBusy(true);
+          const r = await c.translate(lang);
+          setBusy(false);
+          toast(r.ok ? `Translated ${r.count} text${r.count === 1 ? "" : "s"} — please review the wording before publishing` : r.error || "Couldn't translate");
+        }} className="bg-transparent pr-1 outline-none">
+          <option value="">{label}</option>
+          <option value="hi">Hindi (हिन्दी)</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+    </Tip>
+  );
+}
+
 export function ContextToolbar() {
   const { sel, controller: c } = useStudio();
   const toast = useStudio((s) => s.toast);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [kb, setKb] = useState(false);
   if (!c) return null;
   if (sel?.kind === "background" && sel.bg) {
     const bg = sel.bg;
@@ -63,6 +91,7 @@ export function ContextToolbar() {
     <div className="flex h-12 items-center gap-3 border-b border-line bg-surface px-5 text-xs text-ink-faint">
       <span>Click to edit · double-click text to type · <b className="text-ink-soft">Ctrl/Shift-click</b> or <b className="text-ink-soft">drag a box</b> to select several.</span>
       <button onClick={() => c.selectAll()} className="shrink-0 rounded-md border border-line-2 px-3 py-1.5 font-semibold text-ink-soft hover:border-accent hover:text-accent">Select all</button>
+      <TranslateMenu label="Translate all text" />
     </div>
   );
   const t = sel.text;
@@ -71,6 +100,7 @@ export function ContextToolbar() {
 
   return (
     <div className="flex h-12 items-center gap-0.5 overflow-x-auto border-b border-line bg-surface px-3" role="toolbar" aria-label="Selection tools">
+      {kb && isTxt && <HindiKeyboard onClose={() => setKb(false)} />}
       {sel.count > 1 && <span className="mr-2 shrink-0 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">{sel.count} elements selected</span>}
       {isTxt && t && (
         <>
@@ -93,6 +123,8 @@ export function ContextToolbar() {
           <Btn label="Bullets" active={t.bullets} onClick={() => c.toggleBullets()}><List /></Btn>
           <Btn label="Shadow" active={t.shadow} onClick={() => c.toggleShadow()}><Droplets /></Btn>
           <Color label="Text colour" value={t.fill} onChange={(v) => c.setTextColor(v)} />
+          <Btn label="Hindi keyboard" active={kb} onClick={() => setKb((v) => !v)}><Languages /></Btn>
+          <TranslateMenu label="Translate" />
           <Slider label="Line height" value={t.lineHeight} min={0.8} max={2} step={0.05} onChange={(v) => c.setLineHeight(v)} onDone={() => done("Line height")} icon={<Type />} />
           <Sep />
         </>
