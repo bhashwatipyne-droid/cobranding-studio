@@ -1,5 +1,5 @@
 import type { BrandKit, TemplateDef } from "./types";
-import { BONDS_NOTE, BONDS_TITLE, DUSSEHRA_HEAD, DUSSEHRA_SUB, HABITS_HEAD, HABITS_NOTE, QUIZ_DEFAULT } from "./template-paths";
+import { UNITY_HEAD, UNITY_SUB, BONDS_NOTE, BONDS_TITLE, DUSSEHRA_HEAD, DUSSEHRA_SUB, HABITS_HEAD, HABITS_NOTE, QUIZ_DEFAULT } from "./template-paths";
 
 /**
  * Built-in approved templates — the designed "Minimalist" set. Each one is built from live Fabric objects in
@@ -14,6 +14,8 @@ export const BUILTIN_TEMPLATES: TemplateDef[] = [
     headline: HABITS_HEAD, sub: HABITS_NOTE, thumbnail: "/templates/min-nine-habits.jpg" },
   { id: "min-dussehra", name: "Dussehra · Ayudha Puja", category: "Post", topic: "Festivals", style: "Minimalist", layout: "art-dussehra", palette: ["#2b1a6e", "#7a2f8f"], sizeId: "portrait",
     headline: DUSSEHRA_HEAD, sub: DUSSEHRA_SUB, thumbnail: "/templates/min-dussehra.jpg" },
+  { id: "min-unity-day", name: "National Unity Day · Sardar Patel", category: "Post", topic: "Festivals", style: "Minimalist", layout: "art-unity", palette: ["#2a1593", "#6b4fc4"], sizeId: "portrait",
+    headline: UNITY_HEAD, sub: UNITY_SUB, thumbnail: "/templates/min-unity-day.jpg" },
 ];
 
 export const gradientCss = (p: [string, string]) => `linear-gradient(150deg, ${p[0]}, ${p[1]})`;

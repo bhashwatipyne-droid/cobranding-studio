@@ -11,4 +11,7 @@ export const BONDS_NOTE =
 export const HABITS_HEAD = "May the nine forms of Maa Durga inspire the";
 export const HABITS_NOTE = "Mutual Fund investments are subject to market risks, read all scheme related documents carefully.";
 export const DUSSEHRA_HEAD = "Ayudha Puja honours the tools that help us achieve our purpose.";
+export const UNITY_HEAD = "The Iron Man.\nThe unifier.\nThe nation-builder.";
+export const UNITY_SUB = "Today, we honour a leader whose vision helped bring India together. Remembering Sardar Vallabhbhai Patel.";
+export const UNITY_GREETING = "Happy\nNational\nUnity Day.";
 export const DUSSEHRA_SUB = "review your mutual funds and make sure your financial tools are aligned with your goals.";

@@ -100,7 +100,7 @@ const loadedFonts = new Set(["Inter", "Sora", "Poppins", "Playfair Display", "Ro
 /** Families that actually contain Devanagari (Hindi/Marathi) letters. */
 export const DEVANAGARI_FONTS = new Set(["Poppins", "Noto Sans Devanagari", "Noto Serif Devanagari", "Hind", "Mukta", "Baloo 2", "Tiro Devanagari Hindi"]);
 export const hasDevanagari = (s: string) => /[\u0900-\u097F]/.test(s);
-const SINGLE_WEIGHT = new Set(["Tiro Devanagari Hindi", "Bree Serif", "Bebas Neue", "Abril Fatface", "Lobster", "Pacifico", "Satisfy", "Anton", "Righteous", "Great Vibes"]);
+const SINGLE_WEIGHT = new Set(["DM Serif Display", "Tiro Devanagari Hindi", "Bree Serif", "Bebas Neue", "Abril Fatface", "Lobster", "Pacifico", "Satisfy", "Anton", "Righteous", "Great Vibes"]);
 export const FONT_CHOICES = [
   "Inter", "Sora", "Poppins", "Playfair Display", "Roboto", "Merriweather", "Lato", "Georgia",
   "Montserrat", "Open Sans", "Nunito", "Raleway", "Oswald", "Work Sans", "Rubik", "Karla",
@@ -108,7 +108,7 @@ export const FONT_CHOICES = [
   "Josefin Sans", "Cabin", "Barlow", "Mulish", "Heebo", "Libre Baskerville", "Crimson Text",
   "Bitter", "Domine", "Zilla Slab", "Archivo", "Epilogue", "Outfit", "Plus Jakarta Sans",
   "Figtree", "Urbanist", "Bebas Neue", "Abril Fatface", "Bree Serif",
-  "Noto Sans Devanagari", "Hind", "Mukta", "Baloo 2", "Noto Serif Devanagari", "Tiro Devanagari Hindi",
+  "DM Serif Display", "DM Sans", "Noto Sans Devanagari", "Hind", "Mukta", "Baloo 2", "Noto Serif Devanagari", "Tiro Devanagari Hindi",
   "Lobster", "Pacifico", "Dancing Script", "Caveat", "Satisfy", "Comfortaa", "Anton", "Righteous", "Great Vibes", "Cinzel", "Lora", "Noto Sans", "Nunito Sans", "IBM Plex Sans", "Source Sans 3", "Cormorant Garamond",
 ];
 

@@ -71,7 +71,7 @@ export interface DesignDoc {
 export type LayoutId =
   | "hero" | "split" | "card" | "stat" | "quote" | "minimal" | "banner" | "badge"
   /** designed, fully-editable templates (see template-art.ts) */
-  | "art-quiz" | "art-bonds" | "art-habits" | "art-dussehra";
+  | "art-quiz" | "art-bonds" | "art-habits" | "art-dussehra" | "art-unity";
 
 export interface TemplateDef {
   id: string;

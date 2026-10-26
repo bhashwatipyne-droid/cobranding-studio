@@ -12,8 +12,7 @@ import type { BuildInput, BuiltPage } from "./layouts";
 import { rect, tag, text } from "./layouts";
 import { ensureFont } from "./fabric-setup";
 import {
-  BONDS_NOTE, BONDS_TITLE, DUSSEHRA_HEAD, DUSSEHRA_SUB, HABITS_HEAD, HABITS_NOTE, NINE_GLYPH, QUIZ_BLOB, QUIZ_DEFAULT, QUIZ_PILL,
-} from "./template-paths";
+  BONDS_NOTE, BONDS_TITLE, DUSSEHRA_HEAD, DUSSEHRA_SUB, HABITS_HEAD, HABITS_NOTE, NINE_GLYPH, QUIZ_BLOB, QUIZ_DEFAULT, QUIZ_PILL, UNITY_HEAD, UNITY_SUB, UNITY_GREETING, } from "./template-paths";
 
 type Pt = [number, number];
 const WEIGHTS = [300, 400, 500, 600, 700];
@@ -307,6 +306,35 @@ async function dussehra(inp: BuildInput): Promise<BuiltPage> {
   return { objects: o, background: "#2b1a7a" };
 }
 
+// ───────────────────────────── 5 · National Unity Day ─────────────────────────────
+
+const UNITY_INK = "#0b0b0f", UNITY_PURPLE = "#2a1593";
+
+async function unity(inp: BuildInput): Promise<BuiltPage> {
+  await ensureFont("DM Serif Display", [400]);
+  await ensureFont("DM Sans", [400, 700]);
+  const o: FabricObject[] = [];
+  // the photographs, map and faded Parliament are one picture (recolourable); every word and rule below is live
+  o.push(await photo("/templates/unity-art.jpg", inp.w, inp.h, "Background art"));
+  const head = copy("headline", pick(inp.content.headline, UNITY_HEAD), "Headline", { left: 75, top: 128, width: 640, size: 74, weight: 400, color: UNITY_INK, font: "DM Serif Display", lineHeight: 0.96 });
+  if (head.text === UNITY_HEAD) head.set({ richPhrases: [{ text: "The unifier.", fill: UNITY_PURPLE }] });
+  o.push(head);
+  const ruleFill = (w: number) => new Gradient({ type: "linear", gradientUnits: "pixels", coords: { x1: 0, y1: 0, x2: w, y2: 0 }, colorStops: [{ offset: 0, color: "rgba(92,245,198,1)" }, { offset: 1, color: "rgba(92,245,198,0)" }] });
+  const r1 = rect("art", { left: 75, top: 370, width: 415, height: 2.5, fill: ruleFill(415) });
+  r1.set({ layerName: "Divider top" });
+  o.push(r1);
+  const sub = copy("sub", pick(inp.content.sub, UNITY_SUB), "Message", { left: 75, top: 406, width: 455, size: 25, weight: 400, color: "#17171c", font: "DM Sans", lineHeight: 1.26 });
+  if (sub.text === UNITY_SUB) sub.set({ richPhrases: [{ text: "Sardar Vallabhbhai Patel.", fontWeight: 700, fill: UNITY_PURPLE }] });
+  o.push(sub);
+  const greet = copy("art", UNITY_GREETING, "Greeting", { left: 75, top: 1018, width: 420, size: 62, weight: 400, color: UNITY_INK, font: "DM Serif Display", lineHeight: 1.12 });
+  greet.set({ richPhrases: [{ text: "National", fill: UNITY_PURPLE }, { text: "Unity Day.", fill: UNITY_PURPLE }] });
+  o.push(greet);
+  const r2 = rect("art", { left: 75, top: 1260, width: 415, height: 2.5, fill: ruleFill(415) });
+  r2.set({ layerName: "Divider bottom" });
+  o.push(r2);
+  return { objects: o, background: "#f7f5fb" };
+}
+
 // ───────────────────────────── entry ─────────────────────────────
 
 export async function buildArt(inp: BuildInput): Promise<BuiltPage> {
@@ -314,6 +342,7 @@ export async function buildArt(inp: BuildInput): Promise<BuiltPage> {
     case "art-quiz": return quiz(inp);
     case "art-bonds": return bonds(inp);
     case "art-habits": return habits(inp);
+    case "art-unity": return unity(inp);
     default: return dussehra(inp);
   }
 }
