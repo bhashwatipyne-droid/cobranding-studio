@@ -39,6 +39,9 @@ export interface ComplianceCard {
   flags: { term: string; raw: string; alts: string[] }[];
 }
 
+/** Which kinds of element a recolour may touch. */
+export interface RecolorScope { background: boolean; shapes: boolean; text: boolean; pictures: boolean }
+
 export interface ControllerHooks {
   onSelection(info: SelInfo | null): void;
   onLayers(): void;
@@ -715,7 +718,15 @@ export class CanvasController {
   }
 
   /** Remap every saturated colour in the design (shapes, lines, icons, text emphasis, background) onto the kit palette. */
-  private remapPalette(kit: BrandKit) {
+  /** Colours-only recolour (no fonts, logo or strip changes): pick the two colours and which kinds of element follow them. */
+  recolor(primary: string, secondary: string, what: RecolorScope) {
+    this.remapPalette({ color: primary, secondary } as BrandKit, what);
+    this.canvas.requestRenderAll();
+    const parts = [what.background && "background", what.shapes && "shapes", what.text && "text", what.pictures && "pictures"].filter(Boolean);
+    this.commit(`Recoloured ${parts.join(", ") || "nothing"}`);
+  }
+
+  private remapPalette(kit: BrandKit, what: RecolorScope = { background: true, shapes: true, text: true, pictures: true }) {
     const uses: ColorUse[] = [];
     const bg = this.canvas.backgroundColor;
     // the page background's original colours are remembered too, so switching brand kits works from the template, not the last brand
@@ -730,7 +741,7 @@ export class CanvasController {
       src.rich.forEach((c) => { if (c) uses.push({ css: c, weight: 40 }); });
     });
     const map = buildRemap(uses, kit.color, kit.secondary);
-    if (bg instanceof Gradient) {
+    if (what.background && bg instanceof Gradient) {
       // A coloured gradient page runs between the two brand colours: its lightest stop takes the secondary, its darkest the primary.
       const mix = (a: string, b: string, f: number) => {
         const x = parseCss(a), y = parseCss(b);
@@ -747,9 +758,10 @@ export class CanvasController {
         const s0 = bgStops[i] ?? c.color;
         c.color = branded && hi - lo > 0.12 ? mix(kit.color, kit.secondary, (vals[i] - lo) / (hi - lo)) : map(s0);
       });
-    } else if (typeof bg === "string" && bgStops[0]) this.canvas.backgroundColor = map(bgStops[0]);
+    } else if (what.background && typeof bg === "string" && bgStops[0]) this.canvas.backgroundColor = map(bgStops[0]);
     const bgNow = this.canvas.backgroundColor instanceof Gradient ? this.canvas.backgroundColor.colorStops.map((c) => c.color) : [String(this.canvas.backgroundColor || "#ffffff")];
     this.walkArt((o) => {
+      if (isText(o) ? !what.text : !what.shapes) return;
       const src = this.srcOf(o);
       if (o.fill instanceof Gradient && Array.isArray(src.fill)) o.fill.colorStops.forEach((c, i) => { c.color = map(src.fill![i] ?? c.color); });
       else if (typeof src.fill === "string") o.set("fill", map(src.fill));
@@ -762,7 +774,7 @@ export class CanvasController {
     const cr = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
     const all = this.canvas.getObjects();
     all.forEach((t, idx) => {
-      if (!isText(t) || (t.role && ["strip", "details", "logo"].includes(t.role)) || typeof t.fill !== "string") return;
+      if (!(what.background || what.shapes) || !isText(t) || (t.role && ["strip", "details", "logo"].includes(t.role)) || typeof t.fill !== "string") return;
       const fl = lumOf(t.fill);
       if (fl === null) return;
       const cx = (t.left ?? 0) + t.getScaledWidth() / 2, cy = (t.top ?? 0) + t.getScaledHeight() / 2;
@@ -784,7 +796,7 @@ export class CanvasController {
     });
     // full-bleed pictures: rotate their hues so the scene's dominant colour lands on the brand primary
     const targetHue = (() => { const c = parseCss(kit.color); return c ? toHsl(c)[0] : null; })();
-    if (targetHue !== null) {
+    if (what.pictures && targetHue !== null) {
       this.canvas.getObjects().forEach((o) => {
         if (!(o instanceof FabricImage) || o.getScaledWidth() < this.W * 0.9 || o.getScaledHeight() < this.H * 0.6) return;
         const dom = this.dominantHue(o);

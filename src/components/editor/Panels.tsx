@@ -1,6 +1,8 @@
 "use client";
 import { Eye, EyeOff, Heading1, Heading2, Lock, MessageSquare, Pilcrow, Unlock, Upload, ArrowUp, ArrowDown, Circle, Square, Triangle, Minus, MoveRight } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { RecolorScope } from "@/lib/canvas-controller";
+import type { BrandKit } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { SIZES } from "@/lib/fabric-setup";
@@ -17,6 +19,69 @@ const Tile = ({ children, onClick, label }: { children: React.ReactNode; onClick
 
 const BG_SOLIDS = ["#FFFFFF", "#F7F9FC", "#0D1B3E", "#2B2BB5", "#0369A1", "#0F766E", "#B45309", "#E11D48"];
 const BG_GRADS: [string, string][] = [["#2B2BB5", "#0D0D5C"], ["#0369A1", "#0EA5E9"], ["#0F766E", "#10B981"], ["#7C3AED", "#2B2BB5"], ["#0D1B3E", "#546490"], ["#F59E0B", "#E11D48"]];
+
+const QUICK_PALETTES: { name: string; a: string; b: string }[] = [
+  { name: "Royal", a: "#2B2BB5", b: "#9090EC" }, { name: "Ocean", a: "#0369A1", b: "#38BDF8" }, { name: "Forest", a: "#166534", b: "#86EFAC" },
+  { name: "Sunset", a: "#B91C1C", b: "#FB923C" }, { name: "Rose", a: "#9D174D", b: "#F9A8D4" }, { name: "Slate", a: "#0F172A", b: "#94A3B8" },
+];
+
+/** Pick two colours (from the brand kit, a quick palette, or anything) and which kinds of element follow them. Fonts and logo are never touched. */
+function RecolourCard({ kit }: { kit: BrandKit }) {
+  const recolor = useStudio((s) => s.recolor);
+  const [open, setOpen] = useState(false);
+  const [main, setMain] = useState(kit.color);
+  const [acc, setAcc] = useState(kit.secondary);
+  const [what, setWhat] = useState<RecolorScope>({ background: true, shapes: true, text: true, pictures: true });
+  useEffect(() => { setMain(kit.color); setAcc(kit.secondary); }, [kit.key, kit.color, kit.secondary]);
+  const swatchRow = (label: string, value: string, set: (v: string) => void) => (
+    <div>
+      <div className="mb-1 text-[11px] font-bold text-ink-soft">{label}</div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {kit.swatches.map((sw) => (
+          <button key={sw} aria-label={`${label} ${sw}`} aria-pressed={value.toLowerCase() === sw.toLowerCase()} onClick={() => set(sw)} title={sw}
+            className={cn("size-6 rounded-md ring-1 ring-ink/10", value.toLowerCase() === sw.toLowerCase() && "ring-2 ring-accent ring-offset-1")} style={{ background: sw }} />
+        ))}
+        <label title="Any colour" className="relative grid size-6 cursor-pointer place-items-center rounded-md ring-1 ring-ink/10" style={{ background: "conic-gradient(red, yellow, lime, aqua, blue, magenta, red)" }}>
+          <input type="color" aria-label={`${label} — any colour`} value={/^#[0-9a-f]{6}$/i.test(value) ? value : "#2B2BB5"} onChange={(e) => set(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
+        </label>
+        <span className="ml-1 font-mono text-[10px] uppercase text-ink-faint">{value}</span>
+      </div>
+    </div>
+  );
+  const opt = (key: keyof RecolorScope, label: string) => (
+    <label key={key} className="flex cursor-pointer items-center gap-2 text-[12px] font-medium text-ink">
+      <input type="checkbox" checked={what[key]} onChange={(e) => setWhat((w) => ({ ...w, [key]: e.target.checked }))} className="size-3.5 accent-[var(--color-accent)]" />{label}
+    </label>
+  );
+  return (
+    <div>
+      <Button className="w-full" variant="outline" aria-expanded={open} onClick={() => setOpen((v) => !v)}>{open ? "Recolour — close" : "Recolour elements…"}</Button>
+      {open && (
+        <div className="mt-2 space-y-3 rounded-lg border border-line-2 bg-surface-2 p-3">
+          {swatchRow("Main colour", main, setMain)}
+          {swatchRow("Accent colour", acc, setAcc)}
+          <div>
+            <div className="mb-1 text-[11px] font-bold text-ink-soft">Or start from a palette</div>
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => { setMain(kit.color); setAcc(kit.secondary); }} className="rounded-full border border-line-2 bg-white px-2.5 py-1 text-[11px] font-semibold hover:border-accent">Brand kit</button>
+              {QUICK_PALETTES.map((p) => (
+                <button key={p.name} onClick={() => { setMain(p.a); setAcc(p.b); }} className="flex items-center gap-1 rounded-full border border-line-2 bg-white px-2 py-1 text-[11px] font-semibold hover:border-accent">
+                  <span className="size-3 rounded-full" style={{ background: p.a }} /><span className="-ml-2 size-3 rounded-full ring-1 ring-white" style={{ background: p.b }} />{p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="mb-1 text-[11px] font-bold text-ink-soft">Recolour</div>
+            <div className="grid grid-cols-2 gap-1.5">{opt("background", "Background")}{opt("shapes", "Shapes & icons")}{opt("text", "Text highlights")}{opt("pictures", "Pictures")}</div>
+            <p className="mt-1.5 text-[11px] text-ink-faint">Fonts, your logo and the details strip are never changed here. Plain black or white text stays as it is.</p>
+          </div>
+          <Button className="w-full" onClick={() => recolor(main, acc, what)}>Apply colours</Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Panels() {
   const s = useStudio();
@@ -49,7 +114,7 @@ export function Panels() {
           </div>
           <div className="mt-3 space-y-2">
             <Button className="w-full" onClick={() => void s.reapplySetup()}>Apply brand to this post</Button>
-            <Button className="w-full" variant="outline" onClick={() => void s.applyKitAll()}>Recolour all elements</Button>
+            <RecolourCard kit={kit} />
             <Button className="w-full" variant="ghost" onClick={() => s.setSetupOpen(true)}>Edit cobranding setup</Button>
             <Button className="w-full" variant="outline" onClick={() => s.setShareOpen(true)}>Save as template…</Button>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import type { CanvasController, ComplianceCard, HistoryEntry, SelInfo } from "@/lib/canvas-controller";
+import type { CanvasController, ComplianceCard, HistoryEntry, RecolorScope, SelInfo } from "@/lib/canvas-controller";
 import { downloadDesign, renderThumb, type ExportFormat, type ResolutionTier } from "@/lib/export";
 import { sizeById } from "@/lib/fabric-setup";
 import type { BuildInput } from "@/lib/layouts";
@@ -89,6 +89,7 @@ interface StudioState {
   addPage(): Promise<void>;
   deletePage(i: number): Promise<void>;
   changeSize(sizeId: string, relayout?: boolean): Promise<void>;
+  recolor(primary: string, secondary: string, what: RecolorScope): void;
   applyLayoutFrom(tpl: TemplateDef): Promise<void>;
   reapplySetup(): Promise<void>;
   applyKitAll(): Promise<void>;
@@ -305,6 +306,12 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!kit.setupComplete) { get().toast("Set up cobranding first — opening setup"); set({ setupOpen: true }); return; }
     await controller.reapplyKit(kit, doc.palette ?? BUILTIN_TEMPLATES[0].palette, doc.layout);
     get().toast(`Applied ${kit.label} branding to this post`);
+  },
+  recolor(primary, secondary, what) {
+    const { controller } = get();
+    if (!controller) return;
+    controller.recolor(primary, secondary, what);
+    get().toast("Colours updated — fonts and logo left as they were");
   },
   async applyKitAll() {
     const { doc, controller } = get();
