@@ -818,22 +818,22 @@ export class CanvasController {
     if (what.pictures && targetHue !== null) {
       this.canvas.getObjects().forEach((o) => {
         if (!(o instanceof FabricImage) || o.getScaledWidth() < this.W * 0.9 || o.getScaledHeight() < this.H * 0.6) return;
-        const dom = this.dominantHue(o);
-        if (dom === null) return;
-        let d = targetHue - dom;
-        d = ((d + 540) % 360) - 180;
-        const rest = (o.filters ?? []).filter((f) => !(f instanceof filters.HueRotation));
-        o.filters = [...rest, new filters.HueRotation({ rotation: d / 180 })];
-        o.applyFilters();
+        this.tintPictureToHue(o, targetHue);
       });
     }
     this.reflagAll();
   }
 
-  /** Saturation-weighted circular mean hue of a picture (null if it is basically grey). */
-  private dominantHue(img: FabricImage): number | null {
+  /**
+   * Circular mean hue of the picture's *tinted* pixels (null if it is basically grey).
+   * `filtered: false` reads the untouched source image — `getElement()` returns the already hue-rotated copy once a
+   * HueRotation filter is applied, which made every recolour after the first measure the wrong starting hue.
+   * Only clearly coloured pixels count, so a sepia/grey photograph can't drag a pale coloured tint (map, wash) off its hue.
+   */
+  private dominantHue(img: FabricImage, filtered = false): number | null {
     try {
-      const src = img.getElement() as CanvasImageSource & { width: number; height: number };
+      const raw = img as unknown as { _originalElement?: CanvasImageSource };
+      const src = ((filtered ? img.getElement() : raw._originalElement ?? img.getElement()) as CanvasImageSource & { width: number; height: number });
       const cv = document.createElement("canvas");
       cv.width = 48; cv.height = 48;
       const ctx = cv.getContext("2d", { willReadFrequently: true })!;
@@ -841,14 +841,38 @@ export class CanvasController {
       const d = ctx.getImageData(0, 0, 48, 48).data;
       let x = 0, y = 0, w = 0;
       for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue;
         const [h, sat, l] = toHsl({ r: d[i], g: d[i + 1], b: d[i + 2], a: 1 });
-        const wt = sat * (1 - Math.abs(l - 0.5) * 1.6);
-        if (wt <= 0.02) continue;
-        x += Math.cos((h * Math.PI) / 180) * wt; y += Math.sin((h * Math.PI) / 180) * wt; w += wt;
+        if (sat < 0.18 || l < 0.25 || l > 0.97) continue;
+        x += Math.cos((h * Math.PI) / 180) * sat; y += Math.sin((h * Math.PI) / 180) * sat; w += sat;
       }
       if (w < 3) return null;
       return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
     } catch { return null; }
+  }
+
+  /**
+   * Make a picture's dominant hue land on `target` degrees. Always measured from the original pixels, then corrected
+   * against what the filter really produced (a matrix hue-rotate is not an exact HSL hue shift, so one pass can be tens of degrees out).
+   * Returns false if the picture has no colour to move.
+   */
+  private tintPictureToHue(o: FabricImage, target: number): boolean {
+    const dom = this.dominantHue(o);
+    if (dom === null) return false;
+    const wrap = (d: number) => ((d + 540) % 360) - 180;
+    const rest = (o.filters ?? []).filter((f) => !(f instanceof filters.HueRotation));
+    let rot = wrap(target - dom);
+    for (let pass = 0; pass < 3; pass++) {
+      o.filters = [...rest, new filters.HueRotation({ rotation: rot / 180 })];
+      o.applyFilters();
+      const got = this.dominantHue(o, true);
+      if (got === null) break;
+      const err = wrap(target - got);
+      if (Math.abs(err) < 3) break;
+      rot = wrap(rot + err);
+    }
+    o.dirty = true;
+    return true;
   }
 
   // ───────────────────────── adding elements ─────────────────────────
@@ -950,15 +974,7 @@ export class CanvasController {
     if (!isImage(a)) return;
     const c = parseCss(hex);
     if (!c) return;
-    const dom = this.dominantHue(a);
-    const base = (a.filters ?? []).filter((f) => !(f instanceof filters.HueRotation));
-    a.filters = base; a.applyFilters();
-    const dom0 = this.dominantHue(a) ?? dom;
-    if (dom0 === null) { this.hooks.toast("This picture has no dominant colour to change"); return; }
-    let d = toHsl(c)[0] - dom0;
-    d = ((d + 540) % 360) - 180;
-    a.filters = [...base, new filters.HueRotation({ rotation: d / 180 })];
-    a.applyFilters();
+    if (!this.tintPictureToHue(a as FabricImage, toHsl(c)[0])) { this.hooks.toast("This picture has no dominant colour to change"); return; }
     this.canvas.requestRenderAll();
   }
   /** Swap a full-bleed background picture for a plain colour (undoable) and open the background controls. */
