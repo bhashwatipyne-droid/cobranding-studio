@@ -40,7 +40,7 @@ export interface ComplianceCard {
 }
 
 /** Which kinds of element a recolour may touch. */
-export interface RecolorScope { background: boolean; shapes: boolean; text: boolean; pictures: boolean }
+export interface RecolorScope { background: boolean; shapes: boolean; text: boolean; pictures: boolean; darkText?: boolean }
 
 export interface ControllerHooks {
   onSelection(info: SelInfo | null): void;
@@ -720,9 +720,20 @@ export class CanvasController {
   /** Remap every saturated colour in the design (shapes, lines, icons, text emphasis, background) onto the kit palette. */
   /** Colours-only recolour (no fonts, logo or strip changes): pick the two colours and which kinds of element follow them. */
   recolor(primary: string, secondary: string, what: RecolorScope) {
-    this.remapPalette({ color: primary, secondary } as BrandKit, what);
+    const kit = { color: primary, secondary } as BrandKit;
+    this.remapPalette(kit, what);
+    // the same brand touches the old "recolour all" gave: details strip + accent bars follow the two colours, key figures take the main colour
+    this.canvas.getObjects().forEach((o) => {
+      if (what.shapes && (o.role === "accent" || o.role === "strip")) {
+        if (o.fill instanceof Gradient) {
+          o.set("fill", new Gradient({ type: "linear", gradientUnits: "pixels", coords: { x1: 0, y1: 0, x2: o.width, y2: o.role === "strip" ? 0 : o.height }, colorStops: [{ offset: 0, color: primary }, { offset: 1, color: secondary }] }));
+        } else if (typeof o.fill === "string" && o.kind !== "text") o.set("fill", primary);
+        o.dirty = true;
+      }
+      if (what.text && isText(o) && o.role === "stat") { o.set("fill", primary); o.dirty = true; }
+    });
     this.canvas.requestRenderAll();
-    const parts = [what.background && "background", what.shapes && "shapes", what.text && "text", what.pictures && "pictures"].filter(Boolean);
+    const parts = [what.background && "background", what.shapes && "shapes", what.text && "text", what.darkText && "body text", what.pictures && "pictures"].filter(Boolean);
     this.commit(`Recoloured ${parts.join(", ") || "nothing"}`);
   }
 
@@ -764,7 +775,15 @@ export class CanvasController {
       if (isText(o) ? !what.text : !what.shapes) return;
       const src = this.srcOf(o);
       if (o.fill instanceof Gradient && Array.isArray(src.fill)) o.fill.colorStops.forEach((c, i) => { c.color = map(src.fill![i] ?? c.color); });
-      else if (typeof src.fill === "string") o.set("fill", map(src.fill));
+      else if (typeof src.fill === "string") {
+        let f = map(src.fill);
+        // plain dark body text (near-black) becomes a deep shade of the main colour
+        if (isText(o) && what.darkText && (o.role !== "strip" && o.role !== "details")) {
+          const q = parseCss(src.fill);
+          if (q) { const [h, s, l] = toHsl(q); const m = parseCss(kit.color); if (l < 0.22 && s < 0.35 && m) { const [mh, ms] = toHsl(m); const [r, g, b] = fromHsl(mh, Math.min(0.65, Math.max(0.25, ms)), 0.14); void h; f = `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`; } }
+        }
+        o.set("fill", f);
+      }
       if (src.stroke) o.set("stroke", map(src.stroke));
       if (isText(o)) (o.richPhrases ?? []).forEach((p, i) => { const s0 = src.rich[i]; if (s0) p.fill = this.legible(map(s0), bgNow); });
       o.dirty = true;

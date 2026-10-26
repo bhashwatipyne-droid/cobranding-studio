@@ -31,7 +31,7 @@ function RecolourCard({ kit }: { kit: BrandKit }) {
   const [open, setOpen] = useState(false);
   const [main, setMain] = useState(kit.color);
   const [acc, setAcc] = useState(kit.secondary);
-  const [what, setWhat] = useState<RecolorScope>({ background: true, shapes: true, text: true, pictures: true });
+  const [what, setWhat] = useState<RecolorScope>({ background: true, shapes: true, text: true, pictures: true, darkText: false });
   useEffect(() => { setMain(kit.color); setAcc(kit.secondary); }, [kit.key, kit.color, kit.secondary]);
   const swatchRow = (label: string, value: string, set: (v: string) => void) => (
     <div>
@@ -48,9 +48,10 @@ function RecolourCard({ kit }: { kit: BrandKit }) {
       </div>
     </div>
   );
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const opt = (key: keyof RecolorScope, label: string) => (
     <label key={key} className="flex cursor-pointer items-center gap-2 text-[12px] font-medium text-ink">
-      <input type="checkbox" checked={what[key]} onChange={(e) => setWhat((w) => ({ ...w, [key]: e.target.checked }))} className="size-3.5 accent-[var(--color-accent)]" />{label}
+      <input type="checkbox" checked={!!what[key]} onChange={(e) => setWhat((w) => ({ ...w, [key]: e.target.checked }))} className="size-3.5 accent-[var(--color-accent)]" />{label}
     </label>
   );
   return (
@@ -63,9 +64,13 @@ function RecolourCard({ kit }: { kit: BrandKit }) {
           <div>
             <div className="mb-1 text-[11px] font-bold text-ink-soft">Or start from a palette</div>
             <div className="flex flex-wrap gap-1.5">
-              <button onClick={() => { setMain(kit.color); setAcc(kit.secondary); }} className="rounded-full border border-line-2 bg-white px-2.5 py-1 text-[11px] font-semibold hover:border-accent">Brand kit</button>
+              <button aria-pressed={same(main, kit.color) && same(acc, kit.secondary)} onClick={() => { setMain(kit.color); setAcc(kit.secondary); }}
+                className={cn("flex items-center gap-1 rounded-full border bg-white px-2.5 py-1 text-[11px] font-semibold hover:border-accent", same(main, kit.color) && same(acc, kit.secondary) ? "border-accent bg-accent-soft text-accent ring-1 ring-accent" : "border-line-2")}>
+                <span className="size-3 rounded-full" style={{ background: kit.color }} /><span className="-ml-2 size-3 rounded-full ring-1 ring-white" style={{ background: kit.secondary }} />Brand kit
+              </button>
               {QUICK_PALETTES.map((p) => (
-                <button key={p.name} onClick={() => { setMain(p.a); setAcc(p.b); }} className="flex items-center gap-1 rounded-full border border-line-2 bg-white px-2 py-1 text-[11px] font-semibold hover:border-accent">
+                <button key={p.name} aria-pressed={same(main, p.a) && same(acc, p.b)} onClick={() => { setMain(p.a); setAcc(p.b); }}
+                  className={cn("flex items-center gap-1 rounded-full border bg-white px-2 py-1 text-[11px] font-semibold hover:border-accent", same(main, p.a) && same(acc, p.b) ? "border-accent bg-accent-soft text-accent ring-1 ring-accent" : "border-line-2")}>
                   <span className="size-3 rounded-full" style={{ background: p.a }} /><span className="-ml-2 size-3 rounded-full ring-1 ring-white" style={{ background: p.b }} />{p.name}
                 </button>
               ))}
@@ -73,8 +78,8 @@ function RecolourCard({ kit }: { kit: BrandKit }) {
           </div>
           <div>
             <div className="mb-1 text-[11px] font-bold text-ink-soft">Recolour</div>
-            <div className="grid grid-cols-2 gap-1.5">{opt("background", "Background")}{opt("shapes", "Shapes & icons")}{opt("text", "Text highlights")}{opt("pictures", "Pictures")}</div>
-            <p className="mt-1.5 text-[11px] text-ink-faint">Fonts, your logo and the details strip are never changed here. Plain black or white text stays as it is.</p>
+            <div className="grid grid-cols-2 gap-1.5">{opt("background", "Background")}{opt("shapes", "Shapes, icons & strip")}{opt("text", "Coloured text")}{opt("pictures", "Pictures")}{opt("darkText", "Dark body text")}</div>
+            <p className="mt-1.5 text-[11px] text-ink-faint">Fonts and your logo are never changed here. Dark body text only follows your colour if you tick it; white text stays white.</p>
           </div>
           <Button className="w-full" onClick={() => recolor(main, acc, what)}>Apply colours</Button>
         </div>
